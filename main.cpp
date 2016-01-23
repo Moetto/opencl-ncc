@@ -19,7 +19,7 @@ void decode(const char* filename) {
 
 int main(int argc, char *argv[]) {
 
-    const char* filename = argc > 1 ? argv[1] : "test.png";
+    const char* filename = argc > 1 ? argv[1] : "im0.png";
     decode(filename);
 
     return 0;
