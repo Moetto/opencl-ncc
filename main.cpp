@@ -4,10 +4,7 @@
 
 using namespace std;
 
-void decode(const char* filename) {
-    std::vector<unsigned char> image; //the raw pixels
-    unsigned width, height;
-
+void decode(const char *filename, unsigned& width, unsigned& height, vector<unsigned char>& image) {
     //decode
     unsigned error = lodepng::decode(image, width, height, filename);
 
@@ -19,8 +16,10 @@ void decode(const char* filename) {
 
 int main(int argc, char *argv[]) {
 
-    const char* filename = argc > 1 ? argv[1] : "im0.png";
-    decode(filename);
+    const char *filename = argc > 1 ? argv[1] : "im0.png";
+    unsigned width, height;
+    vector<unsigned char> image = vector<unsigned char>();
+    decode(filename, width, height, image);
 
     return 0;
 }
