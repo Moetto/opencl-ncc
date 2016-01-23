@@ -49,6 +49,10 @@ int main(int argc, char *argv[]) {
     unsigned width, height;
     vector<unsigned char> image = vector<unsigned char>();
     decode(filename, width, height, image);
+    vector<uint8_t> gs_image = vector<unsigned char>();
+    rgb_to_grayscale(image, gs_image);
+    encode_gs_to_rgb(gs_image, image, width, height);
+    encode_to_disk("test.png", image, width, height);
 
     return 0;
 }
