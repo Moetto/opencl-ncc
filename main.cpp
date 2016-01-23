@@ -32,16 +32,15 @@ void resize(std::vector<unsigned char> & out, unsigned & outWidth, unsigned & ou
 
 }
 
-void decode(const char* filename) {
-    std::vector<unsigned char> image; //the raw pixels
-    unsigned width, height;
-    unsigned resizedWidth, resizedHeight;
-
+void decode(const char *filename, unsigned& width, unsigned& height, vector<unsigned char>& image) {
     //decode
     unsigned error = lodepng::decode(image, width, height, filename);
 
     //if there's an error, display it
     if(error) std::cout << "decoder error " << error << ": " << lodepng_error_text(error) << std::endl;
+
+
+    unsigned resizedWidth, resizedHeight;
 
     std::vector<unsigned char> resized;
     resize(resized, resizedWidth, resizedHeight, &image, width, height, 4);
@@ -51,11 +50,11 @@ void decode(const char* filename) {
 }
 
 int main(int argc, char *argv[]) {
-    cout << "Hello world!\n";
-    printf("Hello world in C!\n");
 
-    const char* filename = argc > 1 ? argv[1] : "test.png";
-    decode(filename);
+    const char *filename = argc > 1 ? argv[1] : "im0.png";
+    unsigned width, height;
+    vector<unsigned char> image = vector<unsigned char>();
+    decode(filename, width, height, image);
 
     return 0;
 }
