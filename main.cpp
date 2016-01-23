@@ -19,10 +19,10 @@ void resize(std::vector<unsigned char> & out, unsigned & outWidth, unsigned & ou
     out.reserve(outWidth*outHeight*BYTES);
 
     for (unsigned long row=0; row < height; ++row) {
-        for (unsigned long column = 0; column < width * BYTES; column+= BYTES) {
-            if (row % BYTES == 0) {
+        if (row % BYTES == 0) {
+            for (unsigned long column = 0; column < width * BYTES; column+= BYTES) {
                 if (column % (factor * BYTES) == 0) {
-                    const unsigned long i = row*width + column;
+                    const unsigned long i = row*width*BYTES + column;
                     out.push_back(image.at(i));
                     out.push_back(image.at(i+1));
                     out.push_back(image.at(i+2));
