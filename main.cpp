@@ -74,13 +74,16 @@ void encode_to_disk(const char* filename, std::vector<unsigned char>& image, uns
 int main(int argc, char *argv[]) {
 
     const char *filename = argc > 1 ? argv[1] : "im0.png";
-    unsigned width, height;
+    unsigned original_width, original_height, smaller_width, smaller_height;
     vector<unsigned char> image = vector<unsigned char>();
-    decode(filename, width, height, image);
+    decode(filename, original_width, original_height, image);
+    vector<unsigned char> small_image = vector<unsigned char>();
+    resize(small_image, smaller_width, smaller_height, image, original_width, original_height, 4);
     vector<uint8_t> gs_image = vector<unsigned char>();
-    rgb_to_grayscale(image, gs_image);
-    encode_gs_to_rgb(gs_image, image, width, height);
-    encode_to_disk("test.png", image, width, height);
+    rgb_to_grayscale(small_image, gs_image);
+    vector<unsigned char> output_image = vector<unsigned char>();
+    encode_gs_to_rgb(gs_image, output_image, smaller_width, smaller_height);
+    encode_to_disk("test.png", output_image, smaller_width, smaller_height);
 
     return 0;
 }
