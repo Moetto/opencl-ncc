@@ -18,8 +18,6 @@ void decode(const char* filename) {
 }
 
 int main(int argc, char *argv[]) {
-    cout << "Hello world!\n";
-    printf("Hello world in C!\n");
 
     const char* filename = argc > 1 ? argv[1] : "test.png";
     decode(filename);
