@@ -53,7 +53,7 @@ void rgb_to_grayscale (const vector<unsigned char>& rgb_image, vector<unsigned c
     }
 }
 
-void encode_gs_to_rgb (const vector<uint8_t> & gs_image, vector<uint8_t> & rgb_image, unsigned width, unsigned height) {
+void encode_gs_to_rgb (const vector<uint8_t> & gs_image, vector<uint8_t> & rgb_image) {
     rgb_image.clear();
     for (uint8_t pixel : gs_image) {
         for (int i = 0; i < 3 ; i++) {
@@ -82,7 +82,7 @@ int main(int argc, char *argv[]) {
     vector<uint8_t> gs_image = vector<unsigned char>();
     rgb_to_grayscale(small_image, gs_image);
     vector<unsigned char> output_image = vector<unsigned char>();
-    encode_gs_to_rgb(gs_image, output_image, smaller_width, smaller_height);
+    encode_gs_to_rgb(gs_image, output_image);
     encode_to_disk("test.png", output_image, smaller_width, smaller_height);
 
     return 0;
