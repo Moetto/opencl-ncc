@@ -6,6 +6,34 @@ using namespace std;
 
 void encode_to_disk (const char* filename, std::vector<unsigned char>& image, unsigned width, unsigned height);
 
+void resize(std::vector<unsigned char> & out, unsigned & outWidth, unsigned & outHeight,
+            const std::vector<unsigned char> * image, const unsigned width, const unsigned height,
+            const unsigned factor) {
+    const unsigned long length = image->size();
+
+    const int BYTES = 4;
+
+    outWidth = width / factor;
+    outHeight = height / factor;
+
+    out.reserve(outWidth*outHeight*BYTES);
+
+    for (unsigned long row=0; row < height; ++row) {
+        for (unsigned long column = 0; column < width * BYTES; column+= BYTES) {
+            if (row % BYTES == 0) {
+                if (column % (factor * BYTES) == 0) {
+                    const unsigned long i = row*width + column;
+                    out.push_back(image->at(i));
+                    out.push_back(image->at(i+1));
+                    out.push_back(image->at(i+2));
+                    out.push_back(image->at(i+3));
+                }
+            }
+        }
+    }
+
+}
+
 void decode(const char *filename, unsigned& width, unsigned& height, vector<unsigned char>& image) {
     //decode
     unsigned error = lodepng::decode(image, width, height, filename);
