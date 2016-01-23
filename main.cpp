@@ -7,9 +7,9 @@ using namespace std;
 void encode_to_disk (const char* filename, std::vector<unsigned char>& image, unsigned width, unsigned height);
 
 void resize(std::vector<unsigned char> & out, unsigned & outWidth, unsigned & outHeight,
-            const std::vector<unsigned char> * image, const unsigned width, const unsigned height,
+            const std::vector<unsigned char> & image, const unsigned width, const unsigned height,
             const unsigned factor) {
-    const unsigned long length = image->size();
+    const unsigned long length = image.size();
 
     const int BYTES = 4;
 
@@ -23,10 +23,10 @@ void resize(std::vector<unsigned char> & out, unsigned & outWidth, unsigned & ou
             if (row % BYTES == 0) {
                 if (column % (factor * BYTES) == 0) {
                     const unsigned long i = row*width + column;
-                    out.push_back(image->at(i));
-                    out.push_back(image->at(i+1));
-                    out.push_back(image->at(i+2));
-                    out.push_back(image->at(i+3));
+                    out.push_back(image.at(i));
+                    out.push_back(image.at(i+1));
+                    out.push_back(image.at(i+2));
+                    out.push_back(image.at(i+3));
                 }
             }
         }
