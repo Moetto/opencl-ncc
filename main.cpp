@@ -16,6 +16,24 @@ void decode(const char *filename, unsigned& width, unsigned& height, vector<unsi
     //the pixels are now in the vector "image", 4 bytes per pixel, ordered RGBARGBA..., use it as texture, draw it, ...
 }
 
+void rgb_to_grayscale (const vector<unsigned char>& rgb_image, vector<unsigned char>& gs_image) {
+
+    uint8_t gs_pixel;
+    for (int i = 0; i < rgb_image.size(); i += 4) {
+        gs_pixel = 0.2126 * rgb_image[i] + +0.7152 * rgb_image[i + 1] + 0.0722 * rgb_image[i + 2];
+        gs_image.push_back(gs_pixel);
+    }
+}
+
+void encode_gs_to_rgb (const vector<uint8_t> & gs_image, vector<uint8_t> & rgb_image, unsigned width, unsigned height) {
+    rgb_image.clear();
+    for (uint8_t pixel : gs_image) {
+        for (int i = 0; i < 3 ; i++) {
+            rgb_image.push_back((unsigned char) pixel);
+        }
+        rgb_image.push_back(255);
+    }
+}
 
 void encode_to_disk(const char* filename, std::vector<unsigned char>& image, unsigned width, unsigned height) {
     //Encode the image
