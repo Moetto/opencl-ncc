@@ -71,6 +71,21 @@ void encode_to_disk(const char* filename, std::vector<unsigned char>& image, uns
     if (error) std::cout << "encoder error " << error << ": " << lodepng_error_text(error) << std::endl;
 }
 
+/* Constructs a vector of offsets that describes the window of pixels relative to a point in an image
+ * Currently constructs only a basic square
+ */
+vector<int> construct_window(const unsigned win_width, const int win_height, const int im_width) {
+    unsigned win_size = win_width * win_height;
+    vector<int> window = vector<int>(win_size);
+    for (int j=0; j < win_height; j++) {
+        for (int i=0; i < win_width; i++) {
+            window.push_back(j*im_width + i);
+        }
+    }
+
+    return window;
+}
+
 int main(int argc, char *argv[]) {
 
     const char *filename = argc > 1 ? argv[1] : "im0.png";
