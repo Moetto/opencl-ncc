@@ -5,8 +5,8 @@
 using namespace std;
 
 void encode_to_disk(const char *filename, std::vector<unsigned char> &image, unsigned width, unsigned height);
-
-float calculate_mean_value(const vector<uint8_t> &, const vector<std::pair<int, int>> &, unsigned);
+vector<uint8_t> get_window_pixels(const vector<uint8_t> &image, unsigned width, vector<pair<int, int>> window_offsets);
+float calculate_mean_value(vector<uint8_t> pixels);
 
 void resize(std::vector<unsigned char> &out, unsigned &outWidth, unsigned &outHeight,
             const std::vector<unsigned char> &image, const unsigned width, const unsigned height,
@@ -89,13 +89,16 @@ vector<int> construct_window(const unsigned win_width, const int win_height, con
     return window;
 }
 
-void algorithm(const vector<uint8_t> &L_image, const vector <uint8_t> &R_image, unsigned width, unsigned height, unsigned max_disp,
+void algorithm(const vector<uint8_t> &L_image, const vector<uint8_t> &R_image, unsigned width, unsigned height,
+               unsigned max_disp,
                vector<pair<int, int>> &window) {
 
     for (unsigned w = 1; w < width - 1; w++) {
         for (int h = 1; h < height - 1; h++) {
-            float L_mean = calculate_mean_value(L_image, window, width);
-            float R_mean = calculate_mean_value(R_image, window, width);
+            vector<uint8_t> L_window_pixels = get_window_pixels(L_image, width, window);
+            vector<uint8_t> R_window_pixels = get_window_pixels(R_image, width, window);
+            float L_mean = calculate_mean_value(L_window_pixels);
+            float R_mean = calculate_mean_value(R_window_pixels);
             for (int disp = 0; disp < max_disp; disp++) {
 
             }
@@ -103,14 +106,21 @@ void algorithm(const vector<uint8_t> &L_image, const vector <uint8_t> &R_image, 
     }
 }
 
-float calculate_mean_value(const vector<uint8_t> &image, const vector<std::pair<int, int>> &window,
-                           unsigned width) {
-    uint8_t sum = 0;
-    for (int i = 0; i < window.size(); i++) {
-        pair<int, int> offset = window[i];
-        sum += image[offset.first + offset.second * width];
+vector<uint8_t> get_window_pixels(const vector<uint8_t> &image, unsigned width, vector<pair<int, int>> window_offsets) {
+    vector<uint8_t> pixels = vector<uint8_t>();
+    for (int i = 0; i < window_offsets.size(); i++) {
+        pair<int, int> offset = window_offsets[i];
+        pixels.push_back(image[offset.first + offset.second * width]);
     }
-    return sum / window.size();
+    return pixels;
+}
+
+float calculate_mean_value(vector<uint8_t> pixels) {
+    uint8_t sum = 0;
+    for (int i=0;i<pixels.size();i++) {
+        sum += pixels[i];
+    }
+    return sum / pixels.size();
 }
 
 int main(int argc, char *argv[]) {
