@@ -4,10 +4,12 @@
 
 using namespace std;
 
-void encode_to_disk (const char* filename, std::vector<unsigned char>& image, unsigned width, unsigned height);
+void encode_to_disk(const char *filename, std::vector<unsigned char> &image, unsigned width, unsigned height);
 
-void resize(std::vector<unsigned char> & out, unsigned & outWidth, unsigned & outHeight,
-            const std::vector<unsigned char> & image, const unsigned width, const unsigned height,
+float calculate_mean_value(const vector<uint8_t> &, const vector<std::pair<int, int>> &, unsigned);
+
+void resize(std::vector<unsigned char> &out, unsigned &outWidth, unsigned &outHeight,
+            const std::vector<unsigned char> &image, const unsigned width, const unsigned height,
             const unsigned factor) {
     const unsigned long length = image.size();
 
@@ -16,17 +18,17 @@ void resize(std::vector<unsigned char> & out, unsigned & outWidth, unsigned & ou
     outWidth = width / factor;
     outHeight = height / factor;
 
-    out.reserve(outWidth*outHeight*BYTES);
+    out.reserve(outWidth * outHeight * BYTES);
 
-    for (unsigned long row=0; row < height; ++row) {
+    for (unsigned long row = 0; row < height; ++row) {
         if (row % BYTES == 0) {
-            for (unsigned long column = 0; column < width * BYTES; column+= BYTES) {
+            for (unsigned long column = 0; column < width * BYTES; column += BYTES) {
                 if (column % (factor * BYTES) == 0) {
-                    const unsigned long i = row*width*BYTES + column;
+                    const unsigned long i = row * width * BYTES + column;
                     out.push_back(image.at(i));
-                    out.push_back(image.at(i+1));
-                    out.push_back(image.at(i+2));
-                    out.push_back(image.at(i+3));
+                    out.push_back(image.at(i + 1));
+                    out.push_back(image.at(i + 2));
+                    out.push_back(image.at(i + 3));
                 }
             }
         }
@@ -34,7 +36,7 @@ void resize(std::vector<unsigned char> & out, unsigned & outWidth, unsigned & ou
 
 }
 
-void decode(const char *filename, unsigned& width, unsigned& height, vector<unsigned char>& image) {
+void decode(const char *filename, unsigned &width, unsigned &height, vector<unsigned char> &image) {
     //decode
     unsigned error = lodepng::decode(image, width, height, filename);
 
@@ -44,7 +46,7 @@ void decode(const char *filename, unsigned& width, unsigned& height, vector<unsi
     //the pixels are now in the vector "image", 4 bytes per pixel, ordered RGBARGBA..., use it as texture, draw it, ...
 }
 
-void rgb_to_grayscale (const vector<unsigned char>& rgb_image, vector<unsigned char>& gs_image) {
+void rgb_to_grayscale(const vector<unsigned char> &rgb_image, vector<unsigned char> &gs_image) {
 
     uint8_t gs_pixel;
     for (int i = 0; i < rgb_image.size(); i += 4) {
@@ -53,22 +55,44 @@ void rgb_to_grayscale (const vector<unsigned char>& rgb_image, vector<unsigned c
     }
 }
 
-void encode_gs_to_rgb (const vector<uint8_t> & gs_image, vector<uint8_t> & rgb_image) {
+void encode_gs_to_rgb(const vector<uint8_t> &gs_image, vector<uint8_t> &rgb_image) {
     rgb_image.clear();
     for (uint8_t pixel : gs_image) {
-        for (int i = 0; i < 3 ; i++) {
+        for (int i = 0; i < 3; i++) {
             rgb_image.push_back((unsigned char) pixel);
         }
         rgb_image.push_back(255);
     }
 }
 
-void encode_to_disk(const char* filename, std::vector<unsigned char>& image, unsigned width, unsigned height) {
+void encode_to_disk(const char *filename, std::vector<unsigned char> &image, unsigned width, unsigned height) {
     //Encode the image
     unsigned error = lodepng::encode(filename, image, width, height);
 
     //if there's an error, display it
     if (error) std::cout << "encoder error " << error << ": " << lodepng_error_text(error) << std::endl;
+}
+
+void algorithm(const vector<uint8_t> &gs_image, unsigned width, unsigned height, unsigned max_disp,
+               vector<pair<int, int>> &window) {
+
+    for (unsigned w = 1; w < width - 1; w++) {
+        for (int h = 1; h < height - 1; h++) {
+            for (int disp = 0; disp < max_disp; disp++) {
+                calculate_mean_value(gs_image, window, width);
+            }
+        }
+    }
+}
+
+float calculate_mean_value(const vector<uint8_t> &image, const vector<std::pair<int, int>> &window,
+                           unsigned width) {
+    uint8_t sum = 0;
+    for (int i = 0; i < window.size(); i++) {
+        pair<int, int> offset = window[i];
+        sum += image[offset.first + offset.second * width];
+    }
+    return sum / window.size();
 }
 
 int main(int argc, char *argv[]) {
