@@ -77,12 +77,13 @@ void encode_to_disk(const char *filename, std::vector<unsigned char> &image, uns
 /* Constructs a vector of offsets that describes the window of pixels relative to a point in an image
  * Currently constructs only a basic square
  */
-vector<int> construct_window(const unsigned win_width, const int win_height, const int im_width) {
+vector<pair<int,int>> construct_window(const unsigned win_width, const int win_height, const int im_width) {
+
     unsigned win_size = win_width * win_height;
-    vector<int> window = vector<int>(win_size);
+    vector<pair<int,int>> window = vector<pair<int,int>>(win_size);
     for (int j = 0; j < win_height; j++) {
         for (int i = 0; i < win_width; i++) {
-            window.push_back(j * im_width + i);
+            window.push_back(pair<int,int>(j, i));
         }
     }
 
