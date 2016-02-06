@@ -89,13 +89,15 @@ vector<int> construct_window(const unsigned win_width, const int win_height, con
     return window;
 }
 
-void algorithm(const vector<uint8_t> &gs_image, unsigned width, unsigned height, unsigned max_disp,
+void algorithm(const vector<uint8_t> &L_image, const vector <uint8_t> &R_image, unsigned width, unsigned height, unsigned max_disp,
                vector<pair<int, int>> &window) {
 
     for (unsigned w = 1; w < width - 1; w++) {
         for (int h = 1; h < height - 1; h++) {
+            float L_mean = calculate_mean_value(L_image, window, width);
+            float R_mean = calculate_mean_value(R_image, window, width);
             for (int disp = 0; disp < max_disp; disp++) {
-                calculate_mean_value(gs_image, window, width);
+
             }
         }
     }
