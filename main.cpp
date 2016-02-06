@@ -129,11 +129,11 @@ float calculate_mean_value(vector<uint8_t> pixels) {
     return sum / pixels.size();
 }
 
-float calculate_deviation(vector<uint8_t> pixels, float mean) {
+float calculate_deviation(vector<uint8_t> pixels, float mean, unsigned x_disparity) {
     float sum = 0;
 
     for (int i = 0; i < pixels.size(); i++) {
-        sum += pow(pixels[i]-mean, 2);
+        sum += pow(pixels[i-x_disparity]-mean, 2);
     }
     return sqrt(sum/pixels.size());
 }
