@@ -258,8 +258,8 @@ int main(int argc, char *argv[]) {
     Image right = load_image(right_name);
 
     //Here goes the algorithm
-    vector<Offset> window = construct_window(9, 9, left.width);
-    Image output = algorithm(left, right, 90, window);
+    Window window = construct_window(3, 3, left.width);
+    Image output = algorithm(left, right, 9, window);
     cout << output.width << endl;
     vector<unsigned char> output_image = vector<unsigned char>();
     encode_gs_to_rgb(output.pixels, output_image);
