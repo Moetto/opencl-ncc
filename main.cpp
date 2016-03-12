@@ -14,9 +14,62 @@ struct Offset {
     int x, y;
 };
 
+struct Window {
+    vector<Offset> offsets;
+
+    unsigned int maxXOffset() {
+        int max = INT8_MIN;
+        for (int i=0; i< offsets.size(); i++) {
+            if (offsets[i].x > max) {
+                max = offsets[i].x;
+            }
+        }
+        return max;
+    }
+    unsigned int maxYOffset() {
+        int max = INT8_MIN;
+        for (int i=0; i< offsets.size(); i++) {
+            if (offsets[i].y > max) {
+                max = offsets[i].y;
+            }
+        }
+        return max;
+    }
+
+    unsigned int width() {
+        int minx = INT8_MIN;
+        int maxx = INT8_MAX;
+        for (int i=0; i<offsets.size(); i++) {
+            int x = offsets[i].x;
+            if (x < minx) {
+                minx = x;
+            }
+            if (x > maxx) {
+                maxx = x;
+            }
+        }
+        return maxx - minx;
+    }
+
+    unsigned int height() {
+        int miny = INT8_MIN;
+        int maxy = INT8_MAX;
+        for (int i=0; i<offsets.size(); i++) {
+            int y = offsets[i].y;
+            if (y < miny) {
+                miny = y;
+            }
+            if (y > maxy) {
+                maxy = y;
+            }
+        }
+        return maxy - miny;
+    }
+};
+
 void encode_to_disk(const char *filename, std::vector<unsigned char> &image, unsigned width, unsigned height);
 
-vector<uint8_t> get_window_pixels(const Image &image, unsigned x, unsigned y, vector<Offset> window_offsets,
+vector<uint8_t> get_window_pixels(const Image &image, unsigned x, unsigned y, Window window_offsets,
                                   int disparity);
 
 float calculate_mean_value(vector<uint8_t> pixels);
@@ -94,16 +147,16 @@ void encode_to_disk(const char *filename, std::vector<unsigned char> &image, uns
 /* Constructs a vector of offsets that describes the window of pixels relative to a point in an image
  * Currently constructs only a basic square
  */
-vector<Offset> construct_window(const int win_width, const int win_height, const int im_width) {
+Window construct_window(const int win_width, const int win_height, const int im_width) {
 
     unsigned win_size = win_width * win_height;
-    vector<Offset> window;  // = vector<Offset>(win_size);
+    Window window;  // = vector<Offset>(win_size);
     for (int height = -1; height < win_height - 1; height++) {
         for (int width = -1; width < win_width - 1; width++) {
             Offset offset = {};
             offset.y = height;
             offset.x = width;
-            window.push_back(offset);
+            window.offsets.push_back(offset);
         }
     }
     return window;
@@ -124,14 +177,14 @@ double calculate_zncc(vector<uint8_t> L_pixels, vector<uint8_t> R_pixels, float 
     return upper_sum / (sqrt(lower_l_sum) * sqrt(lower_r_sum));
 }
 
-Image algorithm(Image L_image, Image R_image, unsigned max_disp, vector<Offset> &window) {
+Image algorithm(Image L_image, Image R_image, unsigned max_disp, Window &window) {
     Image output;
-    output.width = L_image.width - 9;
-    output.height = L_image.height - 9;
+    output.width = L_image.width - window.width();
+    output.height = L_image.height - window.height();
     output.pixels = vector<unsigned char>();//output.height * output.width);
 
-    for (unsigned y = 4; y < L_image.height - 4; y++) {
-        for (unsigned x = 4; x < L_image.width - 4; x++) {
+    for (unsigned y = window.maxYOffset(); y < L_image.height - window.maxYOffset(); y++) {
+        for (unsigned x = window.maxXOffset(); x < L_image.width - window.maxXOffset(); x++) {
             vector<uint8_t> L_window_pixels = get_window_pixels(L_image, x, y, window, 0);
             float L_mean = calculate_mean_value(L_window_pixels);
             double max_zncc = 0;
@@ -149,18 +202,17 @@ Image algorithm(Image L_image, Image R_image, unsigned max_disp, vector<Offset> 
                 }
             }
             output.pixels.push_back(best_disp*255/max_disp);
-                        // output_pixel = best_disp
+            // output_pixel = best_disp
         }
     }
     return output;
 }
 
-vector<unsigned char> get_window_pixels(const Image &image, unsigned x, unsigned y, vector<Offset> window_offsets,
-                                  int disparity) {
+vector<uint8_t> get_window_pixels(const Image &image, unsigned x, unsigned y, Window window, int disparity) {
     vector<uint8_t> pixels = vector<uint8_t>();
-    for (int i = 0; i < window_offsets.size(); i++) {
-        Offset offset = window_offsets[i];
-        pixels.push_back(image.pixels[y * image.height + offset.y + x + offset.x - disparity]);
+    for (int i = 0; i < window.offsets.size(); i++) {
+        Offset offset = window.offsets[i];
+        pixels.push_back(image.pixels[y*image.height+offset.y + x + offset.x - disparity]);
     }
     return pixels;
 }
