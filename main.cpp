@@ -127,19 +127,25 @@ void algorithm(Image L_image, Image R_image, unsigned max_disp, vector<Offset> &
 
     for (unsigned x = 1; x < L_image.width - 1; x++) {
         for (unsigned y = 1; y < L_image.height - 1; y++) {
+
             vector<uint8_t> L_window_pixels = get_window_pixels(L_image, x, y, window, 0);
             float L_mean = calculate_mean_value(L_window_pixels);
+            double max_zncc = 0;
+            float best_disp = 0;
             for (int disp = 0; disp < max_disp; disp++) {
                 vector<uint8_t> R_window_pixels = get_window_pixels(R_image, x, y, window, disp);
                 float R_mean = calculate_mean_value(R_window_pixels);
 
                 // Calculate ZNCC for window
                 double zncc = calculate_zncc(L_window_pixels, R_window_pixels, L_mean, R_mean);
-                // Update current maximum sum
-                // Update best disp value
 
+                // Update current maximum sum
+                if (zncc > max_zncc) {
+                    max_zncc = zncc;
+                    best_disp = disp;
+                }
             }
-            // Disp = best_disp
+            // output_pixel = best_disp
         }
     }
 }
