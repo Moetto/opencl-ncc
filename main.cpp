@@ -36,9 +36,9 @@ struct Window {
         return max;
     }
 
-    unsigned int width() {
-        int minx = INT8_MIN;
-        int maxx = INT8_MAX;
+    int width() {
+        int minx = INT8_MAX;
+        int maxx = INT8_MIN;
         for (int i=0; i<offsets.size(); i++) {
             int x = offsets[i].x;
             if (x < minx) {
@@ -48,12 +48,12 @@ struct Window {
                 maxx = x;
             }
         }
-        return maxx - minx;
+        return (unsigned) maxx - minx;
     }
 
-    unsigned int height() {
-        int miny = INT8_MIN;
-        int maxy = INT8_MAX;
+    int height() {
+        int miny = INT8_MAX;
+        int maxy = INT8_MIN;
         for (int i=0; i<offsets.size(); i++) {
             int y = offsets[i].y;
             if (y < miny) {
