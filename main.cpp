@@ -5,18 +5,20 @@
 
 using namespace std;
 
+struct Image {
+    unsigned int height, width;
+    vector<unsigned char> pixels;
+};
+
 void encode_to_disk(const char *filename, std::vector<unsigned char> &image, unsigned width, unsigned height);
 
-vector<uint8_t> get_window_pixels(const vector<uint8_t> &image, unsigned width, vector<pair<int, int>> window_offsets);
+vector<uint8_t> get_window_pixels(const Image &image, vector<pair<int, int>> window_offsets);
 
 float calculate_mean_value(vector<uint8_t> pixels);
 
 float calculate_deviation(vector<uint8_t> pixels, float mean);
 
-struct Image {
-    unsigned int height, width;
-    vector<unsigned char> pixels;
-};
+Image load_image(const char *filename);
 
 void resize(std::vector<unsigned char> &out, unsigned &outWidth, unsigned &outHeight,
             const std::vector<unsigned char> &image, const unsigned width, const unsigned height,
@@ -100,14 +102,12 @@ vector<pair<int, int>> construct_window(const unsigned win_width, const int win_
     return window;
 }
 
-void algorithm(const vector<uint8_t> &L_image, const vector<uint8_t> &R_image, unsigned width, unsigned height,
-               unsigned max_disp,
-               vector<pair<int, int>> &window) {
+void algorithm(Image L_image, Image R_image, unsigned max_disp, vector<pair<int, int>> &window) {
 
-    for (unsigned w = 1; w < width - 1; w++) {
-        for (int h = 1; h < height - 1; h++) {
-            vector<uint8_t> L_window_pixels = get_window_pixels(L_image, width, window);
-            vector<uint8_t> R_window_pixels = get_window_pixels(R_image, width, window);
+    for (unsigned w = 1; w < L_image.width - 1; w++) {
+        for (int h = 1; h < L_image.height - 1; h++) {
+            vector<uint8_t> L_window_pixels = get_window_pixels(L_image, (std::vector<pair<int, int>>()));
+            vector<uint8_t> R_window_pixels = get_window_pixels(R_image, (std::vector<pair<int, int>>()));
             float L_mean = calculate_mean_value(L_window_pixels);
             float R_mean = calculate_mean_value(R_window_pixels);
             for (int disp = 0; disp < max_disp; disp++) {
@@ -117,11 +117,11 @@ void algorithm(const vector<uint8_t> &L_image, const vector<uint8_t> &R_image, u
     }
 }
 
-vector<uint8_t> get_window_pixels(const vector<uint8_t> &image, unsigned width, vector<pair<int, int>> window_offsets) {
+vector<uint8_t> get_window_pixels(const Image &image, vector<pair<int, int>> window_offsets) {
     vector<uint8_t> pixels = vector<uint8_t>();
     for (int i = 0; i < window_offsets.size(); i++) {
         pair<int, int> offset = window_offsets[i];
-        pixels.push_back(image[offset.first + offset.second * width]);
+        pixels.push_back(image.pixels[offset.first + offset.second * image.width]);
     }
     return pixels;
 }
@@ -138,14 +138,12 @@ float calculate_deviation(vector<uint8_t> pixels, float mean, unsigned x_dispari
     float sum = 0;
 
     for (int i = 0; i < pixels.size(); i++) {
-        sum += pow(pixels[i-x_disparity]-mean, 2);
+        sum += pow(pixels[i - x_disparity] - mean, 2);
     }
-    return sqrt(sum/pixels.size());
+    return sqrt(sum / pixels.size());
 }
 
-int main(int argc, char *argv[]) {
-
-    const char *filename = argc > 1 ? argv[1] : "im0.png";
+Image load_image(const char *filename) {
     unsigned original_width, original_height, smaller_width, smaller_height;
     vector<unsigned char> image = vector<unsigned char>();
     decode(filename, original_width, original_height, image);
@@ -153,9 +151,28 @@ int main(int argc, char *argv[]) {
     resize(small_image, smaller_width, smaller_height, image, original_width, original_height, 4);
     vector<uint8_t> gs_image = vector<unsigned char>();
     rgb_to_grayscale(small_image, gs_image);
+    Image gs;
+    gs.height = smaller_height;
+    gs.width = smaller_width;
+    gs.pixels = gs_image;
+    return gs;
+}
+
+int main(int argc, char *argv[]) {
+
+    const char *left_name = argc > 1 ? argv[1] : "im0.png";
+    const char *right_name = argc > 2 ? argv[2] : "im1.png";
+
+    Image left = load_image(left_name);
+    Image right = load_image(right_name);
+
+    //Here goes the algorithm
+    vector<pair<int, int>> window = construct_window(9, 9, left.width);
+    algorithm(left, right, 0, window);
+
     vector<unsigned char> output_image = vector<unsigned char>();
-    encode_gs_to_rgb(gs_image, output_image);
-    encode_to_disk("test.png", output_image, smaller_width, smaller_height);
+    //encode_gs_to_rgb(gs_image, output_image);
+    //encode_to_disk("test.png", output_image, smaller_width, smaller_height);
 
     return 0;
 }
