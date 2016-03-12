@@ -111,8 +111,13 @@ void algorithm(Image L_image, Image R_image, unsigned max_disp, vector<pair<int,
             float L_mean = calculate_mean_value(L_window_pixels);
             float R_mean = calculate_mean_value(R_window_pixels);
             for (int disp = 0; disp < max_disp; disp++) {
+                // Calculate ZNCC for window
+
+                // Update current maximum sum
+                // Update best disp value
 
             }
+            // Disp = best_disp
         }
     }
 }
