@@ -13,6 +13,11 @@ float calculate_mean_value(vector<uint8_t> pixels);
 
 float calculate_deviation(vector<uint8_t> pixels, float mean);
 
+struct Image {
+    unsigned int height, width;
+    vector<unsigned char> pixels;
+};
+
 void resize(std::vector<unsigned char> &out, unsigned &outWidth, unsigned &outHeight,
             const std::vector<unsigned char> &image, const unsigned width, const unsigned height,
             const unsigned factor) {
