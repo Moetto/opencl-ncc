@@ -151,8 +151,8 @@ Window construct_window(const int win_width, const int win_height, const int im_
 
     unsigned win_size = win_width * win_height;
     Window window;  // = vector<Offset>(win_size);
-    for (int height = -1; height < win_height - 1; height++) {
-        for (int width = -1; width < win_width - 1; width++) {
+    for (int height = -(win_height / 2); height <= (win_height / 2); height++) {
+        for (int width = -(win_width / 2); width <= (win_width / 2); width++) {
             Offset offset = {};
             offset.y = height;
             offset.x = width;
