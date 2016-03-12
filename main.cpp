@@ -108,6 +108,11 @@ vector<Offset> construct_window(const unsigned win_width, const int win_height, 
     return window;
 }
 
+double calculate_zncc(vector<uint8_t> L_pixels, vector<uint8_t> R_pixels, float L_mean, float R_mean) {
+
+    return 0;
+}
+
 void algorithm(Image L_image, Image R_image, unsigned max_disp, vector<Offset> &window) {
 
     for (unsigned x = 1; x < L_image.width - 1; x++) {
