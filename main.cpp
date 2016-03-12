@@ -113,8 +113,10 @@ void algorithm(Image L_image, Image R_image, unsigned max_disp, vector<Offset> &
     for (unsigned x = 1; x < L_image.width - 1; x++) {
         for (unsigned y = 1; y < L_image.height - 1; y++) {
             vector<uint8_t> L_window_pixels = get_window_pixels(L_image, x, y, window, 0);
+            float L_mean = calculate_mean_value(L_window_pixels);
             for (int disp = 0; disp < max_disp; disp++) {
                 vector<uint8_t> R_window_pixels = get_window_pixels(R_image, x, y, window, disp);
+                float R_mean = calculate_mean_value(R_window_pixels);
 
                 // Calculate ZNCC for window
 
