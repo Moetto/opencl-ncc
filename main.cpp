@@ -109,8 +109,18 @@ vector<Offset> construct_window(const unsigned win_width, const int win_height, 
 }
 
 double calculate_zncc(vector<uint8_t> L_pixels, vector<uint8_t> R_pixels, float L_mean, float R_mean) {
+    double upper_sum = 0;
+    double lower_l_sum = 0;
+    double lower_r_sum = 0;
+    for (int i=0; i < L_pixels.size(); i++) {
+        double L = (L_pixels[i] - L_mean);
+        double R = (R_pixels[i] - R_mean);
+        upper_sum += L*R;
+        lower_l_sum += pow(L, 2);
+        lower_r_sum += pow(R, 2);
+    }
 
-    return 0;
+    return upper_sum / (sqrt(lower_l_sum)*sqrt(lower_r_sum));
 }
 
 void algorithm(Image L_image, Image R_image, unsigned max_disp, vector<Offset> &window) {
@@ -124,7 +134,7 @@ void algorithm(Image L_image, Image R_image, unsigned max_disp, vector<Offset> &
                 float R_mean = calculate_mean_value(R_window_pixels);
 
                 // Calculate ZNCC for window
-
+                double zncc = calculate_zncc(L_window_pixels, R_window_pixels, L_mean, R_mean);
                 // Update current maximum sum
                 // Update best disp value
 
