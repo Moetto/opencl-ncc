@@ -212,7 +212,11 @@ vector<uint8_t> get_window_pixels(const Image &image, unsigned x, unsigned y, Wi
     vector<uint8_t> pixels = vector<uint8_t>();
     for (int i = 0; i < window.offsets.size(); i++) {
         Offset offset = window.offsets[i];
-        pixels.push_back(image.pixels[y*image.height+offset.y + x + offset.x - disparity]);
+        pixels.push_back(image.pixels[
+                                 y*image.width + offset.y
+                                 + x + offset.x
+                                 - disparity
+                         ]);
     }
     return pixels;
 }
