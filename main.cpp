@@ -80,6 +80,8 @@ float calculate_deviation(vector<uint8_t> pixels, float mean);
 
 Image load_image(const char *filename);
 
+Window construct_border_window(int size);
+
 void resize(std::vector<unsigned char> &out, unsigned &outWidth, unsigned &outHeight,
             const std::vector<unsigned char> &image, const unsigned width, const unsigned height,
             const unsigned factor) {
@@ -150,7 +152,6 @@ void encode_to_disk(const char *filename, std::vector<unsigned char> &image, uns
  * Currently constructs only a basic square
  */
 Window construct_window(const int win_width, const int win_height, const int im_width) {
-
     unsigned win_size = win_width * win_height;
     Window window;  // = vector<Offset>(win_size);
     for (int height = -(win_height / 2); height <= (win_height / 2); height++) {
@@ -160,6 +161,50 @@ Window construct_window(const int win_width, const int win_height, const int im_
             offset.x = width;
             window.offsets.push_back(offset);
         }
+    }
+    return window;
+}
+
+Window construct_border_window(int size) {
+    Window window;
+
+    if (size == 1) {
+        Offset o = {};
+        o.x = 0;
+        o.y = 0;
+        window.offsets.push_back(o);
+        return window;
+    }
+
+    int win_width = size;
+    int win_height = size;
+
+    if (win_width % 2 == 0)
+        win_width++;
+    if (win_height % 2 == 0)
+        win_height++;
+
+    int half_height = (win_height - 1) / 2;
+    for (int width = -((win_width - 1) / 2); width <= ((win_width - 1) / 2); width++) {
+        Offset offset = {};
+        offset.y = half_height;
+        offset.x = width;
+        window.offsets.push_back(offset);
+        offset = {};
+        offset.y = -half_height;
+        offset.x = width;
+        window.offsets.push_back(offset);
+    }
+    int half_width = (win_width - 1) / 2;
+    for (int height = -((win_height - 1) / 2) + 1; height <= ((win_height - 1) / 2) - 1; height++) {
+        Offset offset = {};
+        offset.y = height;
+        offset.x = half_width;
+        window.offsets.push_back(offset);
+        offset = {};
+        offset.y = height;
+        offset.x = half_width;
+        window.offsets.push_back(offset);
     }
     return window;
 }
@@ -223,6 +268,25 @@ vector<uint8_t> get_window_pixels(const Image &image, unsigned x, unsigned y, Wi
     return pixels;
 }
 
+vector<uint8_t> get_available_window_pixels(const Image &image, unsigned x, unsigned y, Window window) {
+    vector<uint8_t> pixels = vector<uint8_t>();
+    int h = image.height;
+    int w = image.width;
+    for (int i = 0; i < window.offsets.size(); i++) {
+        Offset offset = window.offsets[i];
+        int real_y = y + offset.y;
+        int real_x = x + offset.x;
+        if (real_y >= 0 && real_y < h && real_x >= 0 && real_x < w) {
+            uint8_t p = image.pixels[
+                    (y + offset.y) * image.width
+                    + x + offset.x
+            ];
+            pixels.push_back(p);
+        }
+    }
+    return pixels;
+}
+
 float calculate_mean_value(vector<unsigned char> pixels) {
     unsigned int sum = 0;
     for (int i = 0; i < pixels.size(); i++) {
@@ -255,6 +319,49 @@ Image load_image(const char *filename) {
     return gs;
 }
 
+Image crossCheck(Image i1, Image i2, int threshold) {
+    Image crossChecked = Image();
+    crossChecked.width = i1.width;
+    crossChecked.height = i1.height;
+
+    for (int i = 0; i < i1.pixels.size(); i++) {
+        unsigned char p1 = i1.pixels[i];
+        unsigned char p2 = i2.pixels[i];
+        if (abs(p1 - p2) > threshold) {
+            crossChecked.pixels.push_back(0);
+        } else {
+            crossChecked.pixels.push_back(p1);
+        }
+    }
+    return crossChecked;
+}
+
+Image occlusionFill(Image image) {
+    Image filled = {};
+    filled.width = image.width;
+    filled.height = image.height;
+
+    for (unsigned int y = 0; y < image.height; y++) {
+        for (unsigned int x = 0; x < image.width; x++) {
+            bool found = false;
+            for (int i = 1; ; i += 2) {
+                Window w = construct_border_window(i);
+                vector<uint8_t> pixels = get_available_window_pixels(image, x, y, w);
+                for (int p = 0; p < pixels.size(); p++) {
+                    if (pixels[p] != 0) {
+                        filled.pixels.push_back(pixels[p]);
+                        found = true;
+                        break;
+                    }
+                }
+                if (found)
+                    break;
+            }
+        }
+    }
+    return filled;
+}
+
 int main(int argc, char *argv[]) {
 
     const char *left_name = argc > 1 ? argv[1] : "im0.png";
@@ -266,17 +373,16 @@ int main(int argc, char *argv[]) {
     //Here goes the algorithm
     Window window = construct_window(9, 9, left.width);
     const int ndisp = 64;
-    Image output = algorithm(left, right, 0, ndisp, window);
-    Image output2 = algorithm(right, left, -ndisp, 0, window);
-    cout << "Output is " << output.width << " pixels wide" << endl;
+    Image image1 = algorithm(left, right, 0, ndisp, window);
+    Image image2 = algorithm(right, left, -ndisp, 0, window);
+
+    Image combined = crossCheck(image1, image2, 8);
+    Image filled = occlusionFill(combined);
+
+    cout << "Output is " << filled.width << " pixels wide" << endl;
     vector<unsigned char> output_image = vector<unsigned char>();
-
-    encode_gs_to_rgb(output.pixels, output_image);
-    encode_to_disk("test.png", output_image, output.width, output.height);
-
-    vector<unsigned char> output_image2 = vector<unsigned char>();
-    encode_gs_to_rgb(output2.pixels, output_image2);
-    encode_to_disk("test2.png", output_image2, output2.width, output2.height);
+    encode_gs_to_rgb(filled.pixels, output_image);
+    encode_to_disk("test.png", output_image, filled.width, filled.height);
 
     return 0;
 }
