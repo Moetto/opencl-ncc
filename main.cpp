@@ -179,19 +179,19 @@ double calculate_zncc(vector<uint8_t> L_pixels, vector<uint8_t> R_pixels, float 
     return upper_sum / (sqrt(lower_l_sum) * sqrt(lower_r_sum));
 }
 
-Image algorithm(Image L_image, Image R_image, unsigned max_disp, Window &window) {
+Image algorithm(Image L_image, Image R_image, int min_disp, int max_disp, Window &window) {
     Image output;
-    output.width = L_image.width - window.width() - max_disp;
+    output.width = L_image.width - window.width() - abs(max_disp - min_disp);
     output.height = L_image.height - window.height();
     output.pixels = vector<unsigned char>();//output.height * output.width);
 
     for (unsigned y = window.maxYOffset(); y < L_image.height - window.maxYOffset(); y++) {
-        for (unsigned x = window.maxXOffset() + max_disp; x < L_image.width - window.maxXOffset(); x++) {
+        for (unsigned x = window.maxXOffset() + max_disp; x < L_image.width - window.maxXOffset() + min_disp; x++) {
             vector<uint8_t> L_window_pixels = get_window_pixels(L_image, x, y, window, 0);
             float L_mean = calculate_mean_value(L_window_pixels);
             double max_zncc = 0;
             int best_disp = 0;
-            for (int disp = 0; disp < max_disp; disp++) {
+            for (int disp = min_disp; disp < max_disp; disp++) {
                 vector<uint8_t> R_window_pixels = get_window_pixels(R_image, x, y, window, disp);
                 float R_mean = calculate_mean_value(R_window_pixels);
 
@@ -200,10 +200,10 @@ Image algorithm(Image L_image, Image R_image, unsigned max_disp, Window &window)
                 // Update current maximum sum
                 if (zncc > max_zncc) {
                     max_zncc = zncc;
-                    best_disp = disp;
+                    best_disp = abs(disp);
                 }
             }
-            output.pixels.push_back(best_disp * 255 / max_disp);
+            output.pixels.push_back(best_disp * 255 / abs(max_disp - min_disp));
             // output_pixel = best_disp
         }
     }
@@ -264,12 +264,19 @@ int main(int argc, char *argv[]) {
     Image right = load_image(right_name);
 
     //Here goes the algorithm
-    Window window = construct_window(3, 3, left.width);
-    Image output = algorithm(left, right, 9, window);
+    Window window = construct_window(9, 9, left.width);
+    const int ndisp = 64;
+    Image output = algorithm(left, right, 0, ndisp, window);
+    Image output2 = algorithm(right, left, -ndisp, 0, window);
     cout << "Output is " << output.width << " pixels wide" << endl;
     vector<unsigned char> output_image = vector<unsigned char>();
+
     encode_gs_to_rgb(output.pixels, output_image);
     encode_to_disk("test.png", output_image, output.width, output.height);
+
+    vector<unsigned char> output_image2 = vector<unsigned char>();
+    encode_gs_to_rgb(output2.pixels, output_image2);
+    encode_to_disk("test2.png", output_image2, output2.width, output2.height);
 
     return 0;
 }
