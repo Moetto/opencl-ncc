@@ -1,9 +1,10 @@
 #include <iostream>
-#include <stdio.h>
-#include <complex>
+#include <math.h>
 #include "lodepng.h"
 
-using namespace std;
+using std::vector;
+using std::cout;
+using std::endl;
 
 struct Image {
     unsigned int height, width;
@@ -19,16 +20,17 @@ struct Window {
 
     unsigned int maxXOffset() {
         int max = INT8_MIN;
-        for (int i=0; i< offsets.size(); i++) {
+        for (int i = 0; i < offsets.size(); i++) {
             if (offsets[i].x > max) {
                 max = offsets[i].x;
             }
         }
         return max;
     }
+
     unsigned int maxYOffset() {
         int max = INT8_MIN;
-        for (int i=0; i< offsets.size(); i++) {
+        for (int i = 0; i < offsets.size(); i++) {
             if (offsets[i].y > max) {
                 max = offsets[i].y;
             }
@@ -39,7 +41,7 @@ struct Window {
     int width() {
         int minx = INT8_MAX;
         int maxx = INT8_MIN;
-        for (int i=0; i<offsets.size(); i++) {
+        for (int i = 0; i < offsets.size(); i++) {
             int x = offsets[i].x;
             if (x < minx) {
                 minx = x;
@@ -54,7 +56,7 @@ struct Window {
     int height() {
         int miny = INT8_MAX;
         int maxy = INT8_MIN;
-        for (int i=0; i<offsets.size(); i++) {
+        for (int i = 0; i < offsets.size(); i++) {
             int y = offsets[i].y;
             if (y < miny) {
                 miny = y;
@@ -120,7 +122,7 @@ void rgb_to_grayscale(const vector<unsigned char> &rgb_image, vector<unsigned ch
 
     uint8_t gs_pixel;
     for (int i = 0; i < rgb_image.size(); i += 4) {
-        gs_pixel = 0.2126 * rgb_image[i] + +0.7152 * rgb_image[i + 1] + 0.0722 * rgb_image[i + 2];
+        gs_pixel = 0.2126 * rgb_image[i] + 0.7152 * rgb_image[i + 1] + 0.0722 * rgb_image[i + 2];
         gs_image.push_back(gs_pixel);
     }
 }
@@ -201,7 +203,7 @@ Image algorithm(Image L_image, Image R_image, unsigned max_disp, Window &window)
                     best_disp = disp;
                 }
             }
-            output.pixels.push_back(best_disp*255/max_disp);
+            output.pixels.push_back(best_disp * 255 / max_disp);
             // output_pixel = best_disp
         }
     }
@@ -264,7 +266,7 @@ int main(int argc, char *argv[]) {
     //Here goes the algorithm
     Window window = construct_window(3, 3, left.width);
     Image output = algorithm(left, right, 9, window);
-    cout << output.width << endl;
+    cout << "Output is " << output.width << " pixels wide" << endl;
     vector<unsigned char> output_image = vector<unsigned char>();
     encode_gs_to_rgb(output.pixels, output_image);
     encode_to_disk("test.png", output_image, output.width, output.height);
