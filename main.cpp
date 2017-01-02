@@ -179,12 +179,12 @@ double calculate_zncc(vector<uint8_t> L_pixels, vector<uint8_t> R_pixels, float 
 
 Image algorithm(Image L_image, Image R_image, unsigned max_disp, Window &window) {
     Image output;
-    output.width = L_image.width - window.width();
+    output.width = L_image.width - window.width() - max_disp;
     output.height = L_image.height - window.height();
     output.pixels = vector<unsigned char>();//output.height * output.width);
 
     for (unsigned y = window.maxYOffset(); y < L_image.height - window.maxYOffset(); y++) {
-        for (unsigned x = window.maxXOffset(); x < L_image.width - window.maxXOffset(); x++) {
+        for (unsigned x = window.maxXOffset() + max_disp; x < L_image.width - window.maxXOffset(); x++) {
             vector<uint8_t> L_window_pixels = get_window_pixels(L_image, x, y, window, 0);
             float L_mean = calculate_mean_value(L_window_pixels);
             double max_zncc = 0;
@@ -213,7 +213,7 @@ vector<uint8_t> get_window_pixels(const Image &image, unsigned x, unsigned y, Wi
     for (int i = 0; i < window.offsets.size(); i++) {
         Offset offset = window.offsets[i];
         pixels.push_back(image.pixels[
-                                 y*image.width + offset.y
+                                 (y + offset.y) * image.width
                                  + x + offset.x
                                  - disparity
                          ]);
