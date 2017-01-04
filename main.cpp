@@ -1,6 +1,7 @@
 #include <iostream>
 #include <math.h>
 #include "lodepng.h"
+#include <sys/time.h>
 
 using std::vector;
 using std::cout;
@@ -367,6 +368,10 @@ int main(int argc, char *argv[]) {
     const char *left_name = argc > 1 ? argv[1] : "im0.png";
     const char *right_name = argc > 2 ? argv[2] : "im1.png";
 
+    timeval startTime, endTime, startPostProcessing;
+
+    gettimeofday(&startTime, NULL);
+
     Image left = load_image(left_name);
     Image right = load_image(right_name);
 
@@ -374,7 +379,12 @@ int main(int argc, char *argv[]) {
     Window window = construct_window(9, 9, left.width);
     const int ndisp = 64;
     Image image1 = algorithm(left, right, 0, ndisp, window);
+    cout << "First image ready" << endl;
     Image image2 = algorithm(right, left, -ndisp, 0, window);
+
+    gettimeofday(&startPostProcessing, NULL);
+    cout << "Main algorithm ready in " << startPostProcessing.tv_sec - startTime.tv_sec <<
+    " seconds. Beginning post processing" << endl;
 
     Image combined = crossCheck(image1, image2, 8);
     Image filled = occlusionFill(combined);
@@ -383,6 +393,9 @@ int main(int argc, char *argv[]) {
     vector<unsigned char> output_image = vector<unsigned char>();
     encode_gs_to_rgb(filled.pixels, output_image);
     encode_to_disk("test.png", output_image, filled.width, filled.height);
+
+    gettimeofday(&endTime, NULL);
+    cout << "Algorithm took " << endTime.tv_sec - startTime.tv_sec << " seconds to complete" << endl;
 
     return 0;
 }
