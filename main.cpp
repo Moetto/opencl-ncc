@@ -18,24 +18,53 @@ struct Offset {
 
 struct Window {
     vector<Offset> offsets;
+    int minX=0, minY=0, maxX=0, maxY=0;
 
-    unsigned int maxXOffset() {
+    int minXOffset() {
+        if (minX != 0) return minX;
+        int min = INT8_MAX;
+        for (int i = 0; i < offsets.size(); i++) {
+            if (offsets[i].x < min) {
+                min = offsets[i].x;
+            }
+        }
+        minX = min;
+        return min;
+    }
+
+    int minYOffset() {
+        if (minY != 0) return minY;
+        int min = INT8_MAX;
+        for (int i = 0; i < offsets.size(); i++) {
+            if (offsets[i].y < min) {
+                min = offsets[i].y;
+            }
+        }
+        minY = min;
+        return min;
+    }
+
+    int maxXOffset() {
+        if (maxX != 0) return maxX;
         int max = INT8_MIN;
         for (int i = 0; i < offsets.size(); i++) {
             if (offsets[i].x > max) {
                 max = offsets[i].x;
             }
         }
+        maxX = max;
         return max;
     }
 
-    unsigned int maxYOffset() {
+    int maxYOffset() {
+        if (maxY != 0) return maxY;
         int max = INT8_MIN;
         for (int i = 0; i < offsets.size(); i++) {
             if (offsets[i].y > max) {
                 max = offsets[i].y;
             }
         }
+        maxY = max;
         return max;
     }
 
