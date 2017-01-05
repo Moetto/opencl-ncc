@@ -25,6 +25,15 @@ void decode(const char *filename, unsigned &width, unsigned &height, vector<unsi
     lodepng::decode(image, width, height, filename);
 }
 
+void encode_to_disk(const char *filename, std::vector<unsigned char> &image, unsigned width, unsigned height) {
+    //Encode the image
+    unsigned error = lodepng::encode(filename, image, width, height);
+
+    //if there's an error, display it
+    if (error) std::cout << "encoder error " << error << ": " << lodepng_error_text(error) << std::endl;
+}
+
+
 Image load_image(const char *filename) {
     unsigned original_width, original_height;
     vector<unsigned char> image = vector<unsigned char>();
@@ -63,11 +72,8 @@ int main(int argc, char *argv[]) {
     cout << "Selected vendor " << vendor << " and devices " << endl;
     for (auto device: devices) {
         std::string name;
-        bool support;
         device.getInfo(CL_DEVICE_NAME, &name);
-        device.getInfo(CL_DEVICE_IMAGE_SUPPORT, &support);
         cout << name << endl;
-        cout << support << endl;
     }
 
     cl::CommandQueue queue = cl::CommandQueue(ctx, devices[0]);
@@ -100,10 +106,10 @@ int main(int argc, char *argv[]) {
 
     try {
         original = cl::Image2D(ctx, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, imageFormat, left.width, left.height, 0,
-                               &left.pixels[0],
-                               &image_err);
-        resized = cl::Image2D(ctx, CL_MEM_HOST_NO_ACCESS, imageFormat, left.width / 4, left.height / 4, 0, NULL,
-                              &image_err);
+                               &left.pixels[0], &image_err);
+        resized = cl::Image2D(ctx, CL_MEM_WRITE_ONLY, imageFormat,
+                              left.width, left.height, 0,
+                              NULL, &image_err);
     } catch (const cl::Error &ex) {
         std::cerr
         << "Error creating image " << endl << ex.what() << " " << ex.err() << endl << "Error " << image_err << endl;
@@ -122,7 +128,7 @@ int main(int argc, char *argv[]) {
         resize.setArg(1, left.width);
         resize.setArg(2, original);
         resize.setArg(3, resized);
-        resize.setArg(4, left.width * left.height * 4);
+        resize.setArg(4, left.width * left.height);
     } catch (const cl::Error &ex) {
         std::cerr << ex.what() << " " << ex.err() << endl;
         return 1;
@@ -130,13 +136,19 @@ int main(int argc, char *argv[]) {
 
     cout << "Putting kernel to work" << endl;
     cl_int err;
-    err = queue.enqueueNDRangeKernel(resize, cl::NullRange, 2, cl::NullRange, NULL, NULL);
+    cl::Event event;
+
+    err = queue.enqueueNDRangeKernel(resize, cl::NullRange, cl::NDRange(left.width, left.height), cl::NullRange,
+                                     NULL,
+                                     &event);
+    if (err != CL_SUCCESS) {
+        cout << "Error in queue " << err << endl;
+        return 1;
+    }
     cout << "Kernel working" << endl;
 
-    //Vector size 1/16 of original image
-    //    vector<uint8_t> output(left.height * left.width / 4);
-    //cout << "Output " << output.size() << &output[0] << endl;
-    uint8_t output[left.width * left.height / 4] = {};
+    //uint8_t *output = (uint8_t *)malloc(sizeof(uint8_t) * left.height * left.width * 4);
+    vector<uint8_t> output(left.height * left.width * 4);
 
     cl::size_t<3> start;
     start[0] = 0;
@@ -144,19 +156,32 @@ int main(int argc, char *argv[]) {
     start[2] = 0;
 
     cl::size_t<3> end;
-    end[1] = 10; //left.height / 4;
-    end[0] = 10; //left.width / 4;
+    end[0] = 100;
+    end[1] = 100;
+
+    end[0] = left.width;
+    end[1] = left.height;
     end[2] = 1;
 
-    cout << end[0] << endl;
-
+    cout << "Waiting" << endl;
+    event.wait();
+    cout << "Ready" << endl;
     try {
-        queue.enqueueReadImage(resized, CL_TRUE, start, end, left.width / 4, left.height / 4, (void *) output, NULL,
-                               NULL);
+        err = queue.enqueueReadImage(resized, CL_TRUE, start, end, 0, 0, &output[0], NULL, NULL);
     } catch (const cl::Error &ex) {
         std::cerr << "Error " << ex.what() << " code " << ex.err() << endl;
+        return 1;
+    }
+    event.wait();
+
+    if (err != CL_SUCCESS) {
+        cout << err << endl;
+        return 1;
     }
 
-    cout << output[1] << endl;
+    cout << "Mem copy ready" << endl;
+
+    encode_to_disk("test.png", output, unsigned(left.width), unsigned(left.height));
+
     cout << "Bye" << endl;
 }
