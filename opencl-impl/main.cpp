@@ -95,9 +95,9 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    cl::ImageFormat imageFormat;
-    imageFormat.image_channel_order = CL_RGBA;
-    imageFormat.image_channel_data_type = CL_UNSIGNED_INT8;
+    cl::ImageFormat originalImageFormat;
+    originalImageFormat.image_channel_order = CL_RGBA;
+    originalImageFormat.image_channel_data_type = CL_UNSIGNED_INT8;
 
     cl_int image_err;
 
@@ -105,11 +105,10 @@ int main(int argc, char *argv[]) {
     cl::Image2D resized;
 
     try {
-        original = cl::Image2D(ctx, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, imageFormat, left.width, left.height, 0,
-                               &left.pixels[0], &image_err);
-        resized = cl::Image2D(ctx, CL_MEM_WRITE_ONLY, imageFormat,
-                              left.width / 4, left.height / 4, 0,
-                              NULL, &image_err);
+        original = cl::Image2D(ctx, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, originalImageFormat, left.width,
+                               left.height, 0, &left.pixels[0], &image_err);
+        resized = cl::Image2D(ctx, CL_MEM_WRITE_ONLY, originalImageFormat, left.width / 4, left.height / 4, 0, NULL,
+                              &image_err);
     } catch (const cl::Error &ex) {
         std::cerr
         << "Error creating image " << endl << ex.what() << " " << ex.err() << endl << "Error " << image_err << endl;
@@ -158,8 +157,8 @@ int main(int argc, char *argv[]) {
     end[0] = 100;
     end[1] = 100;
 
-    end[0] = left.width/4;
-    end[1] = left.height/4;
+    end[0] = left.width / 4;
+    end[1] = left.height / 4;
     end[2] = 1;
 
     cout << "Waiting" << endl;
@@ -180,7 +179,7 @@ int main(int argc, char *argv[]) {
 
     cout << "Mem copy ready" << endl;
 
-    encode_to_disk("test.png", output, unsigned(left.width)/4, unsigned(left.height)/4);
+    encode_to_disk("test.png", output, unsigned(left.width) / 4, unsigned(left.height) / 4);
 
     cout << "Bye" << endl;
 }
