@@ -108,7 +108,7 @@ int main(int argc, char *argv[]) {
         original = cl::Image2D(ctx, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, imageFormat, left.width, left.height, 0,
                                &left.pixels[0], &image_err);
         resized = cl::Image2D(ctx, CL_MEM_WRITE_ONLY, imageFormat,
-                              left.width, left.height, 0,
+                              left.width / 4, left.height / 4, 0,
                               NULL, &image_err);
     } catch (const cl::Error &ex) {
         std::cerr
@@ -147,8 +147,7 @@ int main(int argc, char *argv[]) {
     }
     cout << "Kernel working" << endl;
 
-    //uint8_t *output = (uint8_t *)malloc(sizeof(uint8_t) * left.height * left.width * 4);
-    vector<uint8_t> output(left.height * left.width * 4);
+    vector<uint8_t> output(left.height * left.width / 4);
 
     cl::size_t<3> start;
     start[0] = 0;
@@ -159,8 +158,8 @@ int main(int argc, char *argv[]) {
     end[0] = 100;
     end[1] = 100;
 
-    end[0] = left.width;
-    end[1] = left.height;
+    end[0] = left.width/4;
+    end[1] = left.height/4;
     end[2] = 1;
 
     cout << "Waiting" << endl;
@@ -181,7 +180,7 @@ int main(int argc, char *argv[]) {
 
     cout << "Mem copy ready" << endl;
 
-    encode_to_disk("test.png", output, unsigned(left.width), unsigned(left.height));
+    encode_to_disk("test.png", output, unsigned(left.width)/4, unsigned(left.height)/4);
 
     cout << "Bye" << endl;
 }

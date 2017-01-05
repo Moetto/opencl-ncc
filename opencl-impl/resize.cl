@@ -7,11 +7,11 @@ __kernel void resize(
 
     int x = get_global_id(0);
     int y = get_global_id(1);
-    int2 coord = {x, y};
-    sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_NONE | CLK_FILTER_LINEAR;
-    uint4 pixel = {0, 0, 0, 255};
-    if (x % 2 == 0) {
-        pixel = read_imageui(original, sampler, coord);
+    if (x % 4 == 0 && y % 4 == 0) {
+        int2 coord = {x, y};
+        int2 coord2 = {x / 4, y / 4};
+        sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_NONE | CLK_FILTER_LINEAR;
+        uint4 pixel = read_imageui(original, sampler, coord);
+        write_imageui(resized, coord2, pixel);
     }
-    write_imageui(resized, coord, pixel);
 }
