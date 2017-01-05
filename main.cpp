@@ -10,6 +10,13 @@ using std::endl;
 struct Image {
     unsigned int height, width;
     vector<unsigned char> pixels;
+
+    uint8_t getPixel(int x, int y) {
+        if (x >= width || y >= height) {
+            return 0;
+        }
+        return pixels[y*width + x];
+    }
 };
 
 struct Offset {
@@ -265,7 +272,7 @@ Image algorithm(Image L_image, Image R_image, int min_disp, int max_disp, Window
             vector<uint8_t> L_window_pixels = get_window_pixels(L_image, x, y, window, 0);
             float L_mean = calculate_mean_value(L_window_pixels);
             double max_zncc = 0;
-            int best_disp = 0;
+            uint8_t best_disp = 0;
             for (int disp = min_disp; disp < max_disp; disp++) {
                 // Overflow control
                 if (x - disp + window.minXOffset() < 0
@@ -283,7 +290,7 @@ Image algorithm(Image L_image, Image R_image, int min_disp, int max_disp, Window
                     best_disp = abs(disp);
                 }
             }
-            output.pixels.push_back(best_disp * 255 / abs(max_disp - min_disp));
+            output.pixels.push_back(best_disp);
             // output_pixel = best_disp
         }
     }
@@ -339,12 +346,12 @@ float calculate_deviation(vector<uint8_t> pixels, float mean, unsigned x_dispari
     return sqrt(sum / pixels.size());
 }
 
-Image load_image(const char *filename) {
+Image load_image(const char *filename, unsigned int factor) {
     unsigned original_width, original_height, smaller_width, smaller_height;
     vector<unsigned char> image = vector<unsigned char>();
     decode(filename, original_width, original_height, image);
     vector<unsigned char> small_image = vector<unsigned char>();
-    resize(small_image, smaller_width, smaller_height, image, original_width, original_height, 4);
+    resize(small_image, smaller_width, smaller_height, image, original_width, original_height, factor);
     vector<uint8_t> gs_image = vector<unsigned char>();
     rgb_to_grayscale(small_image, gs_image);
     Image gs;
@@ -354,18 +361,19 @@ Image load_image(const char *filename) {
     return gs;
 }
 
-Image crossCheck(Image i1, Image i2, int threshold) {
+Image crossCheck(Image i1, Image i2, int threshold, uint8_t ndisp) {
     Image crossChecked = Image();
     crossChecked.width = i1.width;
     crossChecked.height = i1.height;
 
     for (int i = 0; i < i1.pixels.size(); i++) {
-        unsigned char p1 = i1.pixels[i];
-        unsigned char p2 = i2.pixels[i];
+        uint8_t p1 = i1.pixels[i];
+        uint8_t p2 = i2.pixels[i];
         if (abs(p1 - p2) > threshold) {
             crossChecked.pixels.push_back(0);
         } else {
-            crossChecked.pixels.push_back(p1);
+            // Map from 0..ndisp to 0..255
+            crossChecked.pixels.push_back(p1 * 255 / ndisp);
         }
     }
     return crossChecked;
@@ -401,32 +409,68 @@ int main(int argc, char *argv[]) {
 
     const char *left_name = argc > 1 ? argv[1] : "im0.png";
     const char *right_name = argc > 2 ? argv[2] : "im1.png";
+    const char *phase = argc > 3 ? argv[3] : "0";
+    const bool save = argc > 4;
 
-    timeval startTime, endTime, startPostProcessing;
+    timeval startTime, endTime, startPostProcessing, endCrossCheck;
 
     gettimeofday(&startTime, NULL);
 
-    Image left = load_image(left_name);
-    Image right = load_image(right_name);
+    Image image1, image2;
 
-    //Here goes the algorithm
-    Window window = construct_window(9, 9, left.width);
-    const int ndisp = 64;
-    Image image1 = algorithm(left, right, 0, ndisp, window);
-    cout << "First image ready" << endl;
-    Image image2 = algorithm(right, left, -ndisp, 0, window);
+    // Maximum disparity value
+    const uint8_t ndisp = 64;
+
+    // Cross-check disparity threshold
+    const int cc_thresh = 8;
+
+    if (strcmp(phase, "0") == 0) {
+        Image left = load_image(left_name, 4);
+        Image right = load_image(right_name, 4);
+
+        //Here goes the algorithm
+        Window window = construct_window(9, 9, left.width);
+        image1 = algorithm(left, right, 0, ndisp, window);
+        cout << "First image ready" << endl;
+        image2 = algorithm(right, left, -ndisp, 0, window);
+        phase = "1";
+        if (save) {
+            vector<uint8_t> image1_out, image2_out;
+            encode_gs_to_rgb(image1.pixels, image1_out);
+            encode_to_disk("zncc1.png", image1_out, image1.width, image1.height);
+            encode_gs_to_rgb(image2.pixels, image2_out);
+            encode_to_disk("zncc2.png", image2_out, image2.width, image2.height);
+        }
+    } else {
+        image1 = load_image("zncc1.png", 1);
+        image2 = load_image("zncc2.png", 1);
+    }
 
     gettimeofday(&startPostProcessing, NULL);
+
     cout << "Main algorithm ready in " << startPostProcessing.tv_sec - startTime.tv_sec <<
     " seconds. Beginning post processing" << endl;
+    if (strcmp(phase, "1") == 0) {
+        gettimeofday(&endCrossCheck, NULL);
 
-    Image combined = crossCheck(image1, image2, 8);
-    Image filled = occlusionFill(combined);
+        Image combined = crossCheck(image1, image2, 8, ndisp);
 
-    cout << "Output is " << filled.width << " pixels wide" << endl;
-    vector<unsigned char> output_image = vector<unsigned char>();
-    encode_gs_to_rgb(filled.pixels, output_image);
-    encode_to_disk("test.png", output_image, filled.width, filled.height);
+        if (save) {
+            vector<uint8_t> image_out;
+            encode_gs_to_rgb(combined.pixels, image_out);
+            encode_to_disk("crosschecked.png", image_out, combined.width, combined.height);
+        }
+
+        cout << "Cross check ready in " << endCrossCheck.tv_sec - startPostProcessing.tv_sec <<
+                " seconds. Beginning occlusion fill" << endl;
+
+        Image filled = occlusionFill(combined);
+
+        cout << "Output is " << filled.width << " pixels wide" << endl;
+        vector<unsigned char> output_image = vector<unsigned char>();
+        encode_gs_to_rgb(filled.pixels, output_image);
+        encode_to_disk("test.png", output_image, filled.width, filled.height);
+    }
 
     gettimeofday(&endTime, NULL);
     cout << "Algorithm took " << endTime.tv_sec - startTime.tv_sec << " seconds to complete" << endl;
