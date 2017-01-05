@@ -11,7 +11,7 @@ struct Image {
     unsigned int height, width;
     vector<unsigned char> pixels;
 
-    uint8_t getPixel(int x, int y) {
+    uint8_t getPixel(int x, int y) const {
         if (x >= width || y >= height) {
             return 0;
         }
@@ -75,7 +75,7 @@ struct Window {
         return max;
     }
 
-    int width() {
+    int width() const {
         int minx = INT8_MAX;
         int maxx = INT8_MIN;
         for (int i = 0; i < offsets.size(); i++) {
@@ -90,7 +90,7 @@ struct Window {
         return (unsigned) maxx - minx;
     }
 
-    int height() {
+    int height() const {
         int miny = INT8_MAX;
         int maxy = INT8_MIN;
         for (int i = 0; i < offsets.size(); i++) {
@@ -106,14 +106,14 @@ struct Window {
     }
 };
 
-void encode_to_disk(const char *filename, std::vector<unsigned char> &image, unsigned width, unsigned height);
+void encode_to_disk(const char *filename, const std::vector<unsigned char> &image, unsigned width, unsigned height);
 
-vector<uint8_t> get_window_pixels(const Image &image, unsigned x, unsigned y, Window window_offsets,
-                                  int disparity);
+vector<uint8_t> get_window_pixels(const Image &image, const int x, const int y, const Window &window_offsets,
+                                  const int disparity);
 
-float calculate_mean_value(vector<uint8_t> pixels);
+float calculate_mean_value(const vector<uint8_t> &pixels);
 
-float calculate_deviation(vector<uint8_t> pixels, float mean);
+float calculate_deviation(const vector<uint8_t> &pixels, const float mean);
 
 Image load_image(const char *filename);
 
@@ -176,7 +176,8 @@ void encode_gs_to_rgb(const vector<uint8_t> &gs_image, vector<uint8_t> &rgb_imag
     }
 }
 
-void encode_to_disk(const char *filename, std::vector<unsigned char> &image, unsigned width, unsigned height) {
+void encode_to_disk(const char *filename, const std::vector<unsigned char> &image,
+                    const unsigned width, const unsigned height) {
     //Encode the image
     unsigned error = lodepng::encode(filename, image, width, height);
 
@@ -202,7 +203,7 @@ Window construct_window(const int win_width, const int win_height, const int im_
     return window;
 }
 
-Window construct_border_window(int size) {
+Window construct_border_window(const int size) {
     Window window;
 
     if (size == 1) {
@@ -246,7 +247,8 @@ Window construct_border_window(int size) {
     return window;
 }
 
-double calculate_zncc(vector<uint8_t> L_pixels, vector<uint8_t> R_pixels, float L_mean, float R_mean) {
+double calculate_zncc(const vector<uint8_t> &L_pixels, const vector<uint8_t> &R_pixels,
+                      const float L_mean, const float R_mean) {
     double upper_sum = 0;
     double lower_l_sum = 0;
     double lower_r_sum = 0;
@@ -261,7 +263,8 @@ double calculate_zncc(vector<uint8_t> L_pixels, vector<uint8_t> R_pixels, float 
     return upper_sum / (sqrt(lower_l_sum) * sqrt(lower_r_sum));
 }
 
-Image algorithm(Image L_image, Image R_image, int min_disp, int max_disp, Window &window) {
+Image algorithm(const Image &L_image, const Image &R_image, const int &min_disp,
+                const int &max_disp, Window &window) {
     Image output;
     output.width = L_image.width - window.width();
     output.height = L_image.height - window.height();
@@ -277,8 +280,9 @@ Image algorithm(Image L_image, Image R_image, int min_disp, int max_disp, Window
                 // Overflow control
                 if (x - disp + window.minXOffset() < 0
                     || x - disp + window.maxXOffset() >= R_image.width) {
-                    break;
+                    continue;
                 }
+
                 vector<uint8_t> R_window_pixels = get_window_pixels(R_image, x, y, window, disp);
                 float R_mean = calculate_mean_value(R_window_pixels);
 
@@ -297,7 +301,8 @@ Image algorithm(Image L_image, Image R_image, int min_disp, int max_disp, Window
     return output;
 }
 
-vector<uint8_t> get_window_pixels(const Image &image, unsigned x, unsigned y, Window window, int disparity) {
+vector<uint8_t> get_window_pixels(const Image &image, const int x, const int y,
+                                  const Window &window, const int disparity) {
     vector<uint8_t> pixels = vector<uint8_t>();
     for (int i = 0; i < window.offsets.size(); i++) {
         Offset offset = window.offsets[i];
@@ -310,7 +315,8 @@ vector<uint8_t> get_window_pixels(const Image &image, unsigned x, unsigned y, Wi
     return pixels;
 }
 
-vector<uint8_t> get_available_window_pixels(const Image &image, unsigned x, unsigned y, Window window) {
+vector<uint8_t> get_available_window_pixels(const Image &image, const unsigned x, const unsigned y,
+                                            const Window &window) {
     vector<uint8_t> pixels = vector<uint8_t>();
     int h = image.height;
     int w = image.width;
@@ -329,7 +335,7 @@ vector<uint8_t> get_available_window_pixels(const Image &image, unsigned x, unsi
     return pixels;
 }
 
-float calculate_mean_value(vector<unsigned char> pixels) {
+float calculate_mean_value(const vector<unsigned char> &pixels) {
     unsigned int sum = 0;
     for (int i = 0; i < pixels.size(); i++) {
         sum += pixels[i];
@@ -337,7 +343,7 @@ float calculate_mean_value(vector<unsigned char> pixels) {
     return sum / pixels.size();
 }
 
-float calculate_deviation(vector<uint8_t> pixels, float mean, unsigned x_disparity) {
+float calculate_deviation(vector<uint8_t> &pixels, float mean, unsigned x_disparity) {
     float sum = 0;
 
     for (int i = 0; i < pixels.size(); i++) {
@@ -361,7 +367,7 @@ Image load_image(const char *filename, unsigned int factor) {
     return gs;
 }
 
-Image crossCheck(Image i1, Image i2, int threshold, uint8_t ndisp) {
+Image crossCheck(const Image &i1, const Image &i2, const int threshold, const uint8_t ndisp) {
     Image crossChecked = Image();
     crossChecked.width = i1.width;
     crossChecked.height = i1.height;
@@ -386,7 +392,7 @@ double abs_dist(int x, int y) {
     return sqrt(x*x + y*y);
 }
 
-uint8_t findNearestNonZeroPixel(Image image, unsigned int x, unsigned int y) {
+uint8_t findNearestNonZeroPixel(const Image &image, const unsigned int x, const unsigned int y) {
     double closest_dist = -1;
     uint8_t closest_pixel = 0;
     for (int offset = 0; ; offset++) {
@@ -414,7 +420,7 @@ uint8_t findNearestNonZeroPixel(Image image, unsigned int x, unsigned int y) {
     }
 }
 
-Image occlusionFill(Image image) {
+Image occlusionFill(const Image &image) {
     Image filled = {};
     filled.width = image.width;
     filled.height = image.height;
