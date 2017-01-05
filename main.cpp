@@ -266,16 +266,25 @@ double calculate_zncc(const vector<uint8_t> &L_pixels, const vector<uint8_t> &R_
 Image algorithm(const Image &L_image, const Image &R_image, const int &min_disp,
                 const int &max_disp, Window &window) {
     Image output;
-    output.width = L_image.width - window.width();
-    output.height = L_image.height - window.height();
+    output.width = L_image.width;
+    output.height = L_image.height;
     output.pixels = vector<unsigned char>();//output.height * output.width);
 
-    for (int y = -window.minYOffset(); y < L_image.height - window.maxYOffset(); y++) {
-        for (int x = -window.minXOffset(); x < L_image.width - window.maxXOffset(); x++) {
+    for (int y = 0; y < L_image.height; y++) {
+        for (int x = 0; x < L_image.width; x++) {
+
+            // Fill edges with zero
+            if (x < -window.minXOffset() || x >= L_image.width - window.maxXOffset() ||
+                    y < -window.minYOffset() || y >= L_image.height - window.maxYOffset()) {
+                output.pixels.push_back(0);
+                continue;
+            }
+
             vector<uint8_t> L_window_pixels = get_window_pixels(L_image, x, y, window, 0);
             float L_mean = calculate_mean_value(L_window_pixels);
             double max_zncc = 0;
             uint8_t best_disp = 0;
+
             for (int disp = min_disp; disp < max_disp; disp++) {
                 // Overflow control
                 if (x - disp + window.minXOffset() < 0
