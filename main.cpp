@@ -132,7 +132,7 @@ void resize(std::vector<unsigned char> &out, unsigned &outWidth, unsigned &outHe
     out.reserve(outWidth * outHeight * BYTES);
 
     for (unsigned long row = 0; row < height; ++row) {
-        if (row % BYTES == 0) {
+        if (row % (factor) == 0) {
             for (unsigned long column = 0; column < width * BYTES; column += BYTES) {
                 if (column % (factor * BYTES) == 0) {
                     const unsigned long i = row * width * BYTES + column;
@@ -170,7 +170,7 @@ void encode_gs_to_rgb(const vector<uint8_t> &gs_image, vector<uint8_t> &rgb_imag
     rgb_image.clear();
     for (uint8_t pixel : gs_image) {
         for (int i = 0; i < 3; i++) {
-            rgb_image.push_back((unsigned char) pixel);
+            rgb_image.push_back(pixel);
         }
         rgb_image.push_back(255);
     }
@@ -379,6 +379,41 @@ Image crossCheck(Image i1, Image i2, int threshold, uint8_t ndisp) {
     return crossChecked;
 }
 
+/**
+ * Absolute value of a two-valued vector (euclidean distance from (0,0)
+ */
+double abs_dist(int x, int y) {
+    return sqrt(x*x + y*y);
+}
+
+uint8_t findNearestNonZeroPixel(Image image, unsigned int x, unsigned int y) {
+    double closest_dist = -1;
+    uint8_t closest_pixel = 0;
+    for (int offset = 0; ; offset++) {
+        double min_dist = offset;
+        if (closest_dist >= 0 && closest_dist <= min_dist) {
+            // We can no longer find a closer pixel within this offset
+            return closest_pixel;
+        }
+        for (int xsign = -offset; xsign <= offset; xsign++) {
+            for (int ysign = -offset; ysign <= offset; ysign++) {
+                if (abs(xsign) < offset && abs(ysign) < offset) {
+                    // Don't consider pixels already calculated
+                    continue;
+                }
+                uint8_t pixel = image.getPixel(x + xsign, y + ysign);
+                if (pixel != 0) {
+                    double dist = abs_dist(xsign, ysign);
+                    if (closest_dist < 0 || closest_dist > dist) {
+                        closest_dist = dist;
+                        closest_pixel = pixel;
+                    }
+                }
+            }
+        }
+    }
+}
+
 Image occlusionFill(Image image) {
     Image filled = {};
     filled.width = image.width;
@@ -386,20 +421,13 @@ Image occlusionFill(Image image) {
 
     for (unsigned int y = 0; y < image.height; y++) {
         for (unsigned int x = 0; x < image.width; x++) {
-            bool found = false;
-            for (int i = 1; ; i += 2) {
-                Window w = construct_border_window(i);
-                vector<uint8_t> pixels = get_available_window_pixels(image, x, y, w);
-                for (int p = 0; p < pixels.size(); p++) {
-                    if (pixels[p] != 0) {
-                        filled.pixels.push_back(pixels[p]);
-                        found = true;
-                        break;
-                    }
-                }
-                if (found)
-                    break;
+            uint8_t closest_pixel;
+            if (image.getPixel(x, y)) {
+                closest_pixel = image.getPixel(x, y);
+            } else {
+                closest_pixel = findNearestNonZeroPixel(image, x, y);
             }
+            filled.pixels.push_back(closest_pixel);
         }
     }
     return filled;
@@ -422,7 +450,7 @@ int main(int argc, char *argv[]) {
     const uint8_t ndisp = 64;
 
     // Cross-check disparity threshold
-    const int cc_thresh = 8;
+    const int cc_thresh = 12;
 
     if (strcmp(phase, "0") == 0) {
         Image left = load_image(left_name, 4);
@@ -453,7 +481,7 @@ int main(int argc, char *argv[]) {
     if (strcmp(phase, "1") == 0) {
         gettimeofday(&endCrossCheck, NULL);
 
-        Image combined = crossCheck(image1, image2, 8, ndisp);
+        Image combined = crossCheck(image1, image2, cc_thresh, ndisp);
 
         if (save) {
             vector<uint8_t> image_out;
