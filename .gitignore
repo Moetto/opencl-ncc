@@ -34,3 +34,13 @@
 
 # Project files
 .idea/
+
+#CMake
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+**/CMakeFiles/*
+
+#Misc
+*.sw*
+opencl_impl
