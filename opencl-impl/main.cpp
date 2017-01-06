@@ -106,15 +106,15 @@ int main(int argc, char *argv[]) {
 
     cl::Image2D original;
     cl::Image2D resized;
-    cl::Image2D znccd;
+    cl::Image2D meaned;
 
     try {
         original = cl::Image2D(ctx, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, imageFormat, left.width,
                                left.height, 0, &left.pixels[0], &image_err);
         resized = cl::Image2D(ctx, CL_MEM_READ_WRITE, imageFormat, resizedImage.width, resizedImage.height, 0,
                               NULL, &image_err);
-        znccd = cl::Image2D(ctx, CL_MEM_READ_WRITE, imageFormat, resizedImage.width, resizedImage.height, 0,
-                            NULL, &image_err);
+        meaned = cl::Image2D(ctx, CL_MEM_READ_WRITE, imageFormat, resizedImage.width, resizedImage.height, 0,
+                             NULL, &image_err);
 
     } catch (const cl::Error &ex) {
         std::cerr
@@ -128,19 +128,18 @@ int main(int argc, char *argv[]) {
         return 1;
 
     cl::Kernel resize(program, "resize");
-    cl::Kernel zncc(program, "zncc");
+    cl::Kernel mean(program, "calculate_mean");
 
     try {
         resize.setArg(0, left.height);
-        zncc.setArg(0, resizedImage.height);
         resize.setArg(1, left.width);
-        zncc.setArg(1, resizedImage.width);
         resize.setArg(2, original);
-        zncc.setArg(2, resized);
         resize.setArg(3, resized);
-        zncc.setArg(3, znccd);
         resize.setArg(4, left.width * left.height);
-        zncc.setArg(4, resizedImage.width * resizedImage.height);
+
+        mean.setArg(0, resized);
+        mean.setArg(1, meaned);
+        mean.setArg(2, 4);
     } catch (const cl::Error &ex) {
         std::cerr << ex.what() << " " << ex.err() << endl;
         return 1;
@@ -154,7 +153,7 @@ int main(int argc, char *argv[]) {
                                      NULL, &e1);
     vector<cl::Event> await = vector<cl::Event>();
     await.push_back(e1);
-    err = queue.enqueueNDRangeKernel(zncc, cl::NullRange, cl::NDRange(resizedImage.width, resizedImage.height),
+    err = queue.enqueueNDRangeKernel(mean, cl::NullRange, cl::NDRange(resizedImage.width, resizedImage.height),
                                      cl::NullRange, &await, &e2);
     if (err != CL_SUCCESS) {
         cout << "Error in queue " << err << endl;
@@ -179,7 +178,7 @@ int main(int argc, char *argv[]) {
     cout << "Ready" << endl;
 
     try {
-        err = queue.enqueueReadImage(znccd, CL_TRUE, start, end, 0, 0, &output[0], NULL, NULL);
+        err = queue.enqueueReadImage(meaned, CL_TRUE, start, end, 0, 0, &output[0], NULL, NULL);
     } catch (const cl::Error &ex) {
         std::cerr << "Error " << ex.what() << " code " << ex.err() << endl;
         return 1;

@@ -19,26 +19,24 @@ __kernel void resize(
 }
 
 
-__kernel void zncc(
-        const long heigh,
-        const long width,
+__kernel void calculate_mean(
         __read_only image2d_t input,
         __write_only image2d_t output,
-        const long image_size) {
+        int window_size) {
     int x = get_global_id(0);
     int y = get_global_id(1);
     int2 coord = {x, y};
     sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP_TO_EDGE | CLK_FILTER_LINEAR;
 
     ulong mean = 0;
-    for (int y1 = - 3; y1 <= 3 ; y1++) {
-        for (int x1 = -3 ; x1 <= 3 ; x1++) {
+    for (int y1 = - window_size; y1 <= window_size ; y1++) {
+        for (int x1 = -window_size ; x1 <= window_size ; x1++) {
             int2 coord2 = {x+x1, y+y1};
             mean += read_imageui(input, sampler, coord2).s0;
         }
     }
 
-    uint val = (uint) (mean / 49);
+    uint val = (uint) (mean / ((2*window_size+1)*(2*window_size+1)));
     uint4 pix = {val, val, val, 255};
     write_imageui(output, coord, pix);
 }
