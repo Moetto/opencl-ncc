@@ -152,6 +152,7 @@ int main(int argc, char *argv[]) {
     cl::Kernel resize(program, "resize");
     cl::Kernel mean(program, "calculate_mean");
     cl::Kernel zncc(program, "calculate_zncc");
+    cl::Kernel crossCheck(program, "cross_check");
 
     try {
         resize.setArg(0, h);
@@ -162,6 +163,16 @@ int main(int argc, char *argv[]) {
         std::cerr << ex.what() << " " << ex.err() << endl;
         return 1;
     }
+
+    cl::size_t<3> start;
+    start[0] = 0;
+    start[1] = 0;
+    start[2] = 0;
+
+    cl::size_t<3> end;
+    end[0] = resizedImage.width;
+    end[1] = resizedImage.height;
+    end[2] = 1;
 
     for (auto set : {left, right}) {
         try {
@@ -191,16 +202,6 @@ int main(int argc, char *argv[]) {
 
         vector<uint8_t> output(resizedImage.height * resizedImage.width * 4);
 
-        cl::size_t<3> start;
-        start[0] = 0;
-        start[1] = 0;
-        start[2] = 0;
-
-        cl::size_t<3> end;
-        end[0] = resizedImage.width;
-        end[1] = resizedImage.height;
-        end[2] = 1;
-
         cout << "Waiting" << endl;
         e2.wait();
 
@@ -222,34 +223,32 @@ int main(int argc, char *argv[]) {
     }
 
     zncc.setArg(5, 4);
-    zncc.setArg(6, 70);
 
-    for (auto set : {left}) {
-        zncc.setArg(0, left.gs);
-        zncc.setArg(1, right.gs);
-        zncc.setArg(2, left.meaned);
-        zncc.setArg(3, right.meaned);
-        zncc.setArg(4, left.znccd);
+    for (int i = 0; i < 2; i++) {
+        int disp = 70;
+        int min_disp, max_disp;
+        min_disp = i == 0 ? 0 : -disp;
+        max_disp = i == 0 ? disp : 0;
+        imageSet l = i == 0 ? left : right;
+        imageSet r = i == 0 ? right : left;
+
+        zncc.setArg(0, l.gs);
+        zncc.setArg(1, r.gs);
+        zncc.setArg(2, l.meaned);
+        zncc.setArg(3, r.meaned);
+        zncc.setArg(4, l.znccd);
+        zncc.setArg(6, min_disp);
+        zncc.setArg(7, max_disp);
 
         cl::Event e1;
         int err = queue.enqueueNDRangeKernel(zncc, cl::NullRange,
                                              cl::NDRange(resizedImage.width, resizedImage.height), cl::NullRange, NULL,
                                              &e1);
-         vector<uint8_t> output(resizedImage.height * resizedImage.width * 4);
-
-        cl::size_t<3> start;
-        start[0] = 0;
-        start[1] = 0;
-        start[2] = 0;
-
-        cl::size_t<3> end;
-        end[0] = resizedImage.width;
-        end[1] = resizedImage.height;
-        end[2] = 1;
+        vector<uint8_t> output(resizedImage.height * resizedImage.width * 4);
 
         e1.wait();
         try {
-            err = queue.enqueueReadImage(set.znccd, CL_TRUE, start, end, 0, 0, &output[0], NULL, NULL);
+            err = queue.enqueueReadImage(l.znccd, CL_TRUE, start, end, 0, 0, &output[0], NULL, NULL);
         } catch (const cl::Error &ex) {
             std::cerr << "Error " << ex.what() << " code " << ex.err() << endl;
             return 1;
@@ -260,8 +259,40 @@ int main(int argc, char *argv[]) {
             return 1;
         }
         cout << "Mem copy ready" << endl;
-        encode_to_disk((string("zncc_").append(set.fileName)).c_str(), output, unsigned(resizedImage.width), unsigned(resizedImage.height));
+        encode_to_disk((string("zncc_").append(l.fileName)).c_str(), output,
+                       unsigned(resizedImage.width), unsigned(resizedImage.height));
     }
+
+
+    crossCheck.setArg(0, left.znccd);
+    crossCheck.setArg(1, right.znccd);
+    crossCheck.setArg(2, left.output);
+    crossCheck.setArg(3, 8);
+
+    cl::Event e1;
+    int err = queue.enqueueNDRangeKernel(crossCheck, cl::NullRange,
+                                         cl::NDRange(resizedImage.width, resizedImage.height), cl::NullRange, NULL,
+                                         &e1);
+
+    vector<uint8_t> output(resizedImage.height * resizedImage.width * 4);
+
+    e1.wait();
+    try {
+        err = queue.enqueueReadImage(left.output, CL_TRUE, start, end, 0, 0, &output[0], NULL, NULL);
+    } catch (const cl::Error &ex) {
+        std::cerr << "Error " << ex.what() << " code " << ex.err() << endl;
+        return 1;
+    }
+
+    if (err != CL_SUCCESS) {
+        cout << err << endl;
+        return 1;
+    }
+
+    cout << "Mem copy ready" << endl;
+    encode_to_disk((string("cross_checked").append(left.fileName)).c_str(), output,
+                   unsigned(resizedImage.width), unsigned(resizedImage.height));
+
 
     cout << "Bye" << endl;
 }

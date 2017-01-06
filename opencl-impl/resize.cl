@@ -49,6 +49,7 @@ __kernel void calculate_zncc(
         __read_only image2d_t right_mean,
         __write_only image2d_t output,
         int window_size,
+        int min_disp,
         int max_disp
         ) {
         sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP_TO_EDGE | CLK_FILTER_LINEAR;
@@ -58,7 +59,7 @@ __kernel void calculate_zncc(
 
         int l_mean = read_imageui(left_mean, sampler, coord).s0;
         float lower_left_sum = 0;
-        uint best_disp = 0;
+        int best_disp = min_disp;
         float best_zncc = 0;
 
         for(int y1 = -window_size ; y1 <= window_size; y1++ ) {
@@ -69,7 +70,7 @@ __kernel void calculate_zncc(
             }
         }
 
-        for (int disp = 0; disp < max_disp; disp++) {
+        for (int disp = min_disp ; disp < max_disp ; disp++) {
             float lower_right_sum = 0;
             long upper_sum = 0;
             for(int y2 = -window_size ; y2 <= window_size; y2++ ) {
@@ -89,6 +90,32 @@ __kernel void calculate_zncc(
                 best_zncc = zncc;
             }
         }
+        best_disp = abs(best_disp);
         uint4 best_pix = {best_disp, best_disp, best_disp, 255};
         write_imageui(output, coord, best_pix);
 }
+
+__kernel void cross_check(
+    __read_only image2d_t left,
+    __read_only image2d_t right,
+    __write_only image2d_t output,
+    uint threshold
+    ) {
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+
+    int2 coord = {x,y};
+
+    sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_NONE | CLK_FILTER_LINEAR;
+    uint l = read_imageui(left, sampler, coord).s0;
+    uint r = read_imageui(right, sampler, coord).s0;
+
+    if(abs(l-r) < threshold){
+        uint4 pix = {l, l, l, 255};
+        write_imageui(output, coord, pix);
+    } else {
+        uint4 pix = {0, 0, 0, 255};
+        write_imageui(output, coord, pix);
+    }
+}
+
