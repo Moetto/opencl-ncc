@@ -51,6 +51,9 @@ int main(int argc, char *argv[]) {
 
     Image left = load_image(left_name);
     Image right = load_image(right_name);
+    Image resizedImage = {};
+    resizedImage.width = left.width / 4;
+    resizedImage.height = left.height / 4;
 
     vector<cl::Platform> platforms;
     cl::Platform::get(&platforms);
@@ -95,20 +98,24 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    cl::ImageFormat originalImageFormat;
-    originalImageFormat.image_channel_order = CL_RGBA;
-    originalImageFormat.image_channel_data_type = CL_UNSIGNED_INT8;
+    cl::ImageFormat imageFormat;
+    imageFormat.image_channel_order = CL_RGBA;
+    imageFormat.image_channel_data_type = CL_UNSIGNED_INT8;
 
     cl_int image_err;
 
     cl::Image2D original;
     cl::Image2D resized;
+    cl::Image2D znccd;
 
     try {
-        original = cl::Image2D(ctx, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, originalImageFormat, left.width,
+        original = cl::Image2D(ctx, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, imageFormat, left.width,
                                left.height, 0, &left.pixels[0], &image_err);
-        resized = cl::Image2D(ctx, CL_MEM_WRITE_ONLY, originalImageFormat, left.width / 4, left.height / 4, 0, NULL,
-                              &image_err);
+        resized = cl::Image2D(ctx, CL_MEM_READ_WRITE, imageFormat, resizedImage.width, resizedImage.height, 0,
+                              NULL, &image_err);
+        znccd = cl::Image2D(ctx, CL_MEM_READ_WRITE, imageFormat, resizedImage.width, resizedImage.height, 0,
+                            NULL, &image_err);
+
     } catch (const cl::Error &ex) {
         std::cerr
         << "Error creating image " << endl << ex.what() << " " << ex.err() << endl << "Error " << image_err << endl;
@@ -121,13 +128,19 @@ int main(int argc, char *argv[]) {
         return 1;
 
     cl::Kernel resize(program, "resize");
+    cl::Kernel zncc(program, "zncc");
 
     try {
         resize.setArg(0, left.height);
+        zncc.setArg(0, resizedImage.height);
         resize.setArg(1, left.width);
+        zncc.setArg(1, resizedImage.width);
         resize.setArg(2, original);
+        zncc.setArg(2, resized);
         resize.setArg(3, resized);
+        zncc.setArg(3, znccd);
         resize.setArg(4, left.width * left.height);
+        zncc.setArg(4, resizedImage.width * resizedImage.height);
     } catch (const cl::Error &ex) {
         std::cerr << ex.what() << " " << ex.err() << endl;
         return 1;
@@ -135,18 +148,21 @@ int main(int argc, char *argv[]) {
 
     cout << "Putting kernel to work" << endl;
     cl_int err;
-    cl::Event event;
+    cl::Event e1, e2;
 
     err = queue.enqueueNDRangeKernel(resize, cl::NullRange, cl::NDRange(left.width, left.height), cl::NullRange,
-                                     NULL,
-                                     &event);
+                                     NULL, &e1);
+    vector<cl::Event> await = vector<cl::Event>();
+    await.push_back(e1);
+    err = queue.enqueueNDRangeKernel(zncc, cl::NullRange, cl::NDRange(resizedImage.width, resizedImage.height),
+                                     cl::NullRange, &await, &e2);
     if (err != CL_SUCCESS) {
         cout << "Error in queue " << err << endl;
         return 1;
     }
     cout << "Kernel working" << endl;
 
-    vector<uint8_t> output(left.height * left.width / 4);
+    vector<uint8_t> output(resizedImage.height * resizedImage.width * 4);
 
     cl::size_t<3> start;
     start[0] = 0;
@@ -154,23 +170,20 @@ int main(int argc, char *argv[]) {
     start[2] = 0;
 
     cl::size_t<3> end;
-    end[0] = 100;
-    end[1] = 100;
-
     end[0] = left.width / 4;
     end[1] = left.height / 4;
     end[2] = 1;
 
     cout << "Waiting" << endl;
-    event.wait();
+    e2.wait();
     cout << "Ready" << endl;
+
     try {
-        err = queue.enqueueReadImage(resized, CL_TRUE, start, end, 0, 0, &output[0], NULL, NULL);
+        err = queue.enqueueReadImage(znccd, CL_TRUE, start, end, 0, 0, &output[0], NULL, NULL);
     } catch (const cl::Error &ex) {
         std::cerr << "Error " << ex.what() << " code " << ex.err() << endl;
         return 1;
     }
-    event.wait();
 
     if (err != CL_SUCCESS) {
         cout << err << endl;
@@ -179,7 +192,7 @@ int main(int argc, char *argv[]) {
 
     cout << "Mem copy ready" << endl;
 
-    encode_to_disk("test.png", output, unsigned(left.width) / 4, unsigned(left.height) / 4);
+    encode_to_disk("test.png", output, unsigned(resizedImage.width), unsigned(resizedImage.height));
 
     cout << "Bye" << endl;
 }
