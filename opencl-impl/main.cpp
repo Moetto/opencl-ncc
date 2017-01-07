@@ -7,6 +7,7 @@
 #include <CL/cl.hpp>
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <malloc.h>
 
 using std::vector;
@@ -51,9 +52,24 @@ Image load_image(const char *filename) {
     return img;
 }
 
+int getIntArg(char *arg, int defval) {
+    istringstream ss(arg);
+    int x;
+    if (!(ss >> x)) {
+        cerr << "Invalid number " << arg << endl;
+        return defval;
+    }
+    else {
+        return x;
+    }
+}
+
 int main(int argc, char *argv[]) {
     const char *left_name = argc > 1 ? argv[1] : "im0.png";
     const char *right_name = argc > 2 ? argv[2] : "im1.png";
+    const int ndisp = argc > 3 ? getIntArg(argv[3], 70) : 70;
+    const int thresh = argc > 4 ? getIntArg(argv[4], 8) : 8;
+
     left.fileName = "left.png";
     right.fileName = "right.png";
 
@@ -227,10 +243,9 @@ int main(int argc, char *argv[]) {
     zncc.setArg(5, 4);
 
     for (int i = 0; i < 2; i++) {
-        int disp = 70;
         int min_disp, max_disp;
-        min_disp = i == 0 ? 0 : -disp;
-        max_disp = i == 0 ? disp : 0;
+        min_disp = i == 0 ? 0 : -ndisp;
+        max_disp = i == 0 ? ndisp : 0;
         imageSet l = i == 0 ? left : right;
         imageSet r = i == 0 ? right : left;
 
@@ -268,8 +283,8 @@ int main(int argc, char *argv[]) {
     crossCheck.setArg(0, left.znccd);
     crossCheck.setArg(1, right.znccd);
     crossCheck.setArg(2, crossChecked);
-    crossCheck.setArg(3, 8);
-    crossCheck.setArg(4, 70);
+    crossCheck.setArg(3, thresh);
+    crossCheck.setArg(4, ndisp);
 
     cl::Event e1;
     int err = queue.enqueueNDRangeKernel(crossCheck, cl::NullRange,
