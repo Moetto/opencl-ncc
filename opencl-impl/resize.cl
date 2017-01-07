@@ -128,6 +128,7 @@ __kernel void nearest_nonzero(
     ) {
     int x = get_global_id(0);
     int y = get_global_id(1);
+    int2 coord={x, y};
 
     float closest_dist = -1;
     uint closest_value = 0;
@@ -146,10 +147,10 @@ __kernel void nearest_nonzero(
                     continue;
                 }
 
-                int2 coord = {x+xsign,y + ysign};
-                uint pixel = read_imageui(input, sampler, coord).s0;
+                int2 coord2 = {x+xsign,y + ysign};
+                uint pixel = read_imageui(input, sampler, coord2).s0;
                 if (pixel > 0) {
-                    float dist = sqrt(xsign * xsign + ysign * ysign);
+                    float dist = sqrt((float)(xsign * xsign + ysign * ysign));
                     if (closest_dist < 0 || closest_dist > dist) {
                         closest_dist = dist;
                         closest_value = pixel;
@@ -159,8 +160,7 @@ __kernel void nearest_nonzero(
         }
     }
 
-    uint4 pix = {closest_value, closest_value, closest_value, 255}
+    uint4 pix = {closest_value, closest_value, closest_value, 255};
     write_imageui(output, coord, pix);
-
 }
 

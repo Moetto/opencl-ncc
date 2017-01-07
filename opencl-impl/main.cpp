@@ -110,7 +110,7 @@ int main(int argc, char *argv[]) {
     cl::ImageFormat imageFormat;
     imageFormat.image_channel_order = CL_RGBA;
     imageFormat.image_channel_data_type = CL_UNSIGNED_INT8;
-
+    cl::Image2D crossChecked, occlusionFilled;
     cl_int image_err;
 
 
@@ -124,9 +124,6 @@ int main(int argc, char *argv[]) {
                                   NULL, &image_err);
         left.znccd = cl::Image2D(ctx, CL_MEM_READ_WRITE, imageFormat, resizedImage.width, resizedImage.height, 0, NULL,
                                  &image_err);
-        left.output = cl::Image2D(ctx, CL_MEM_WRITE_ONLY, imageFormat, resizedImage.width, resizedImage.height, 0, NULL,
-                                  &image_err);
-
 
         right.original = cl::Image2D(ctx, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, imageFormat, w,
                                      h, 0, &right.originalImage.pixels[0], &image_err);
@@ -136,8 +133,12 @@ int main(int argc, char *argv[]) {
                                    NULL, &image_err);
         right.znccd = cl::Image2D(ctx, CL_MEM_READ_WRITE, imageFormat, resizedImage.width, resizedImage.height, 0,
                                   NULL, &image_err);
-        right.output = cl::Image2D(ctx, CL_MEM_WRITE_ONLY, imageFormat, resizedImage.width, resizedImage.height, 0,
+
+        crossChecked = cl::Image2D(ctx, CL_MEM_READ_WRITE, imageFormat, resizedImage.width, resizedImage.height, 0,
                                    NULL, &image_err);
+        occlusionFilled = cl::Image2D(ctx, CL_MEM_WRITE_ONLY, imageFormat, resizedImage.width, resizedImage.height, 0,
+                                      NULL, &image_err);
+
     } catch (const cl::Error &ex) {
         std::cerr
         << "Error creating image " << endl << ex.what() << " " << ex.err() << endl << "Error " << image_err << endl;
@@ -267,7 +268,7 @@ int main(int argc, char *argv[]) {
 
     crossCheck.setArg(0, left.znccd);
     crossCheck.setArg(1, right.znccd);
-    crossCheck.setArg(2, left.crosschecked);
+    crossCheck.setArg(2, crossChecked);
     crossCheck.setArg(3, 8);
 
     cl::Event e1;
@@ -276,12 +277,11 @@ int main(int argc, char *argv[]) {
                                          &e1);
 
 
-
     vector<uint8_t> crosschecked(resizedImage.height * resizedImage.width * 4);
 
     e1.wait();
     try {
-        err = queue.enqueueReadImage(left.crosschecked, CL_TRUE, start, end, 0, 0, &crosschecked[0], NULL, NULL);
+        err = queue.enqueueReadImage(crossChecked, CL_TRUE, start, end, 0, 0, &crosschecked[0], NULL, NULL);
     } catch (const cl::Error &ex) {
         std::cerr << "Error " << ex.what() << " code " << ex.err() << endl;
         return 1;
@@ -293,24 +293,22 @@ int main(int argc, char *argv[]) {
     }
 
     cout << "Cross check ready" << endl;
-    encode_to_disk((string("cross_checked")).c_str(), crosschecked,
-                   unsigned(resizedImage.width), unsigned(resizedImage.height));
+    encode_to_disk("cross_checked.png", crosschecked, unsigned(resizedImage.width), unsigned(resizedImage.height));
 
-
-    occlusionFill.setArg(0, left.crosschecked);
-    occlusionFill.setArg(1, left.output);
+    occlusionFill.setArg(0, crossChecked);
+    occlusionFill.setArg(1, occlusionFilled);
 
     cl::Event e2;
-    int err = queue.enqueueNDRangeKernel(occlusionFill, cl::NullRange,
-                                         cl::NDRange(resizedImage.width, resizedImage.height), cl::NullRange, NULL,
-                                         &e1);
+    err = queue.enqueueNDRangeKernel(occlusionFill, cl::NullRange,
+                                     cl::NDRange(resizedImage.width, resizedImage.height), cl::NullRange, NULL,
+                                     &e2);
 
     vector<uint8_t> output(resizedImage.height * resizedImage.width * 4);
 
     e2.wait();
 
     try {
-        err = queue.enqueueReadImage(left.output, CL_TRUE, start, end, 0, 0, &crosschecked[0], NULL, NULL);
+        err = queue.enqueueReadImage(occlusionFilled, CL_TRUE, start, end, 0, 0, &crosschecked[0], NULL, NULL);
     } catch (const cl::Error &ex) {
         std::cerr << "Error " << ex.what() << " code " << ex.err() << endl;
         return 1;
@@ -322,8 +320,7 @@ int main(int argc, char *argv[]) {
     }
 
     cout << "Occlusion fill ready" << endl;
-    encode_to_disk((string("output").append(left.fileName)).c_str(), crosschecked,
-                   unsigned(resizedImage.width), unsigned(resizedImage.height));
+    encode_to_disk("ready.png", crosschecked, unsigned(resizedImage.width), unsigned(resizedImage.height));
 
 
     cout << "Bye" << endl;
