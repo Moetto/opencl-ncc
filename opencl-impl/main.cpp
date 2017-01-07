@@ -9,9 +9,12 @@
 #include <fstream>
 #include <sstream>
 #include <malloc.h>
+#include "../lib/timing.h"
 
 using std::vector;
 using std::cout;
+using std::cerr;
+using std::istringstream;
 using std::endl;
 using std::string;
 
@@ -65,6 +68,9 @@ int getIntArg(char *arg, int defval) {
 }
 
 int main(int argc, char *argv[]) {
+    Timer timer= Timer();
+    timer.start();
+
     const char *left_name = argc > 1 ? argv[1] : "im0.png";
     const char *right_name = argc > 2 ? argv[2] : "im1.png";
     const int ndisp = argc > 3 ? getIntArg(argv[3], 70) : 70;
@@ -73,8 +79,10 @@ int main(int argc, char *argv[]) {
     left.fileName = "left.png";
     right.fileName = "right.png";
 
+    timer.checkPoint("Load images from disk");
     left.originalImage = load_image(left_name);
     right.originalImage = load_image(right_name);
+    timer.checkPoint("Images loaded");
 
     Image resizedImage = {};
     resizedImage.width = left.originalImage.width / 4;
@@ -85,7 +93,7 @@ int main(int argc, char *argv[]) {
     vector<cl::Device> devices;
     platforms[0].getDevices(CL_DEVICE_TYPE_GPU, &devices);
 
-    cout << "Creating context" << endl;
+    timer.checkPoint("Create context");
     cl::Context ctx = cl::Context(
             devices,
             NULL,
@@ -93,6 +101,7 @@ int main(int argc, char *argv[]) {
             NULL,
             NULL
     );
+    timer.checkPoint("Context ready");
 
     std::string vendor, deviceName;
     platforms[0].getInfo(CL_PLATFORM_VENDOR, &vendor);
@@ -131,6 +140,7 @@ int main(int argc, char *argv[]) {
 
 
     size_t h = left.originalImage.height, w = left.originalImage.width;
+    timer.checkPoint("Start creating OpenCL images");
     try {
         left.original = cl::Image2D(ctx, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, imageFormat, w,
                                     h, 0, &left.originalImage.pixels[0], &image_err);
@@ -161,10 +171,10 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    if (image_err == CL_SUCCESS)
-        cout << "Image created successfully " << endl;
-    else
+    if (image_err != CL_SUCCESS)
         return 1;
+    timer.checkPoint("Images ready");
+
 
     cl::Kernel resize(program, "resize");
     cl::Kernel mean(program, "calculate_mean");
@@ -193,6 +203,7 @@ int main(int argc, char *argv[]) {
     end[2] = 1;
 
     for (auto set : {left, right}) {
+        vector<uint8_t> output(resizedImage.height * resizedImage.width * 4);
         try {
             resize.setArg(2, set.original);
             resize.setArg(3, set.gs);
@@ -203,30 +214,28 @@ int main(int argc, char *argv[]) {
             return 1;
         }
 
-        cout << "Putting kernel to work" << endl;
         cl_int err;
         cl::Event e1, e2;
 
+        timer.checkPoint("Resize and grayscale");
         err = queue.enqueueNDRangeKernel(resize, cl::NullRange, cl::NDRange(w, h), cl::NullRange, NULL, &e1);
         vector<cl::Event> await = vector<cl::Event>();
-        await.push_back(e1);
+        e1.wait();
+        timer.checkPoint("Resize ready. Calculate mean");
         err = queue.enqueueNDRangeKernel(mean, cl::NullRange, cl::NDRange(resizedImage.width, resizedImage.height),
-                                         cl::NullRange, &await, &e2);
+                                         cl::NullRange, NULL, &e2);
         if (err != CL_SUCCESS) {
             cout << "Error in queue " << err << endl;
             return 1;
         }
-        cout << "Kernel working" << endl;
 
-        vector<uint8_t> output(resizedImage.height * resizedImage.width * 4);
-
-        cout << "Waiting" << endl;
         e2.wait();
-
-        cout << "Ready" << endl;
+        timer.checkPoint("Mean ready");
 
         try {
+            timer.checkPoint("Start reading image");
             err = queue.enqueueReadImage(set.meaned, CL_TRUE, start, end, 0, 0, &output[0], NULL, NULL);
+            timer.checkPoint("Image read ready");
         } catch (const cl::Error &ex) {
             std::cerr << "Error " << ex.what() << " code " << ex.err() << endl;
             return 1;
@@ -236,13 +245,15 @@ int main(int argc, char *argv[]) {
             cout << err << endl;
             return 1;
         }
-        cout << "Resizing ready" << endl;
+        timer.checkPoint("Save image");
         encode_to_disk(set.fileName.c_str(), output, unsigned(resizedImage.width), unsigned(resizedImage.height));
+        timer.checkPoint("Save ready");
     }
 
     zncc.setArg(5, 4);
 
     for (int i = 0; i < 2; i++) {
+        vector<uint8_t> output(resizedImage.height * resizedImage.width * 4);
         int min_disp, max_disp;
         min_disp = i == 0 ? 0 : -ndisp;
         max_disp = i == 0 ? ndisp : 0;
@@ -258,12 +269,14 @@ int main(int argc, char *argv[]) {
         zncc.setArg(7, max_disp);
 
         cl::Event e1;
+
+        timer.checkPoint("Start zncc");
         int err = queue.enqueueNDRangeKernel(zncc, cl::NullRange,
                                              cl::NDRange(resizedImage.width, resizedImage.height), cl::NullRange, NULL,
                                              &e1);
-        vector<uint8_t> output(resizedImage.height * resizedImage.width * 4);
 
         e1.wait();
+        timer.checkPoint("Zncc ready");
         try {
             err = queue.enqueueReadImage(l.znccd, CL_TRUE, start, end, 0, 0, &output[0], NULL, NULL);
         } catch (const cl::Error &ex) {
@@ -275,7 +288,6 @@ int main(int argc, char *argv[]) {
             cout << err << endl;
             return 1;
         }
-        cout << "ZNCC " << (i ? "right" : "left") << " ready" << endl;
         encode_to_disk((string("zncc_").append(l.fileName)).c_str(), output,
                        unsigned(resizedImage.width), unsigned(resizedImage.height));
     }
@@ -307,7 +319,6 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    cout << "Cross check ready" << endl;
     encode_to_disk("cross_checked.png", crosschecked, unsigned(resizedImage.width), unsigned(resizedImage.height));
 
     occlusionFill.setArg(0, crossChecked);
@@ -323,7 +334,11 @@ int main(int argc, char *argv[]) {
     e2.wait();
 
     try {
-        err = queue.enqueueReadImage(occlusionFilled, CL_TRUE, start, end, 0, 0, &crosschecked[0], NULL, NULL);
+        cl::Event event;
+        timer.checkPoint("Start occlusion fill");
+        err = queue.enqueueReadImage(occlusionFilled, CL_TRUE, start, end, 0, 0, &crosschecked[0], NULL, &event);
+        event.wait();
+        timer.checkPoint("Occlusion fill ready");
     } catch (const cl::Error &ex) {
         std::cerr << "Error " << ex.what() << " code " << ex.err() << endl;
         return 1;
@@ -334,9 +349,8 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    cout << "Occlusion fill ready" << endl;
     encode_to_disk("ready.png", crosschecked, unsigned(resizedImage.width), unsigned(resizedImage.height));
 
-
+    timer.stop();
     cout << "Bye" << endl;
 }

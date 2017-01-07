@@ -13,6 +13,8 @@ set(SOURCE_FILES
         resize.cl
         lodepng.h
         lodepng.cpp
+        ../lib/timing.h
+        ../lib/timing.cpp
         )
 
 add_executable(opencl_impl ${SOURCE_FILES})
