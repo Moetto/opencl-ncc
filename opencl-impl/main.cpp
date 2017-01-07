@@ -26,7 +26,7 @@ struct Image {
 
 struct imageSet {
     Image originalImage;
-    cl::Image2D original, gs, meaned, znccd, crosschecked, output;
+    cl::Image2D original, gs, meaned, znccd;
     string fileName;
 } left, right;
 
