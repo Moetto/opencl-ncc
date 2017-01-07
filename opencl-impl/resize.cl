@@ -119,3 +119,48 @@ __kernel void cross_check(
     }
 }
 
+/* Finds the nearest nonzero pixel by extending a ring around the current pixel
+ *
+ */
+__kernel void nearest_nonzero(
+    __read_only image2d_t input,
+    __write_only image2d_t output
+    ) {
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+
+    float closest_dist = -1;
+    uint closest_value = 0;
+
+    sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP | CLK_FILTER_LINEAR;
+
+    for (int offset = 0; offset < 100; offset++) {
+        if (closest_dist >= 0 && closest_dist <= offset) {
+            // We can no longer find a closer pixel within the current offset
+            break;
+        }
+        for (int xsign = -offset; xsign <= offset; xsign++) {
+            for (int ysign = -offset; ysign <= offset; ysign++) {
+                if (abs(xsign) < offset && abs(ysign) < offset) {
+                    // Don't loop the same pixels again
+                    continue;
+                }
+
+                int2 coord = {x+xsign,y + ysign};
+                uint pixel = read_imageui(input, sampler, coord).s0;
+                if (pixel > 0) {
+                    float dist = sqrt(xsign * xsign + ysign * ysign);
+                    if (closest_dist < 0 || closest_dist > dist) {
+                        closest_dist = dist;
+                        closest_value = pixel;
+                    }
+                }
+            }
+        }
+    }
+
+    uint4 pix = {closest_value, closest_value, closest_value, 255}
+    write_imageui(output, coord, pix);
+
+}
+

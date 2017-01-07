@@ -22,7 +22,7 @@ struct Image {
 
 struct imageSet {
     Image originalImage;
-    cl::Image2D original, gs, meaned, znccd, output;
+    cl::Image2D original, gs, meaned, znccd, crosschecked, output;
     string fileName;
 } left, right;
 
@@ -153,6 +153,7 @@ int main(int argc, char *argv[]) {
     cl::Kernel mean(program, "calculate_mean");
     cl::Kernel zncc(program, "calculate_zncc");
     cl::Kernel crossCheck(program, "cross_check");
+    cl::Kernel occlusionFill(program, "nearest_nonzero");
 
     try {
         resize.setArg(0, h);
@@ -218,7 +219,7 @@ int main(int argc, char *argv[]) {
             cout << err << endl;
             return 1;
         }
-        cout << "Mem copy ready" << endl;
+        cout << "Resizing ready" << endl;
         encode_to_disk(set.fileName.c_str(), output, unsigned(resizedImage.width), unsigned(resizedImage.height));
     }
 
@@ -258,7 +259,7 @@ int main(int argc, char *argv[]) {
             cout << err << endl;
             return 1;
         }
-        cout << "Mem copy ready" << endl;
+        cout << "ZNCC " << (i ? "right" : "left") << " ready" << endl;
         encode_to_disk((string("zncc_").append(l.fileName)).c_str(), output,
                        unsigned(resizedImage.width), unsigned(resizedImage.height));
     }
@@ -266,7 +267,7 @@ int main(int argc, char *argv[]) {
 
     crossCheck.setArg(0, left.znccd);
     crossCheck.setArg(1, right.znccd);
-    crossCheck.setArg(2, left.output);
+    crossCheck.setArg(2, left.crosschecked);
     crossCheck.setArg(3, 8);
 
     cl::Event e1;
@@ -274,11 +275,13 @@ int main(int argc, char *argv[]) {
                                          cl::NDRange(resizedImage.width, resizedImage.height), cl::NullRange, NULL,
                                          &e1);
 
-    vector<uint8_t> output(resizedImage.height * resizedImage.width * 4);
+
+
+    vector<uint8_t> crosschecked(resizedImage.height * resizedImage.width * 4);
 
     e1.wait();
     try {
-        err = queue.enqueueReadImage(left.output, CL_TRUE, start, end, 0, 0, &output[0], NULL, NULL);
+        err = queue.enqueueReadImage(left.crosschecked, CL_TRUE, start, end, 0, 0, &crosschecked[0], NULL, NULL);
     } catch (const cl::Error &ex) {
         std::cerr << "Error " << ex.what() << " code " << ex.err() << endl;
         return 1;
@@ -289,8 +292,37 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    cout << "Mem copy ready" << endl;
-    encode_to_disk((string("cross_checked").append(left.fileName)).c_str(), output,
+    cout << "Cross check ready" << endl;
+    encode_to_disk((string("cross_checked")).c_str(), crosschecked,
+                   unsigned(resizedImage.width), unsigned(resizedImage.height));
+
+
+    occlusionFill.setArg(0, left.crosschecked);
+    occlusionFill.setArg(1, left.output);
+
+    cl::Event e2;
+    int err = queue.enqueueNDRangeKernel(occlusionFill, cl::NullRange,
+                                         cl::NDRange(resizedImage.width, resizedImage.height), cl::NullRange, NULL,
+                                         &e1);
+
+    vector<uint8_t> output(resizedImage.height * resizedImage.width * 4);
+
+    e2.wait();
+
+    try {
+        err = queue.enqueueReadImage(left.output, CL_TRUE, start, end, 0, 0, &crosschecked[0], NULL, NULL);
+    } catch (const cl::Error &ex) {
+        std::cerr << "Error " << ex.what() << " code " << ex.err() << endl;
+        return 1;
+    }
+
+    if (err != CL_SUCCESS) {
+        cout << err << endl;
+        return 1;
+    }
+
+    cout << "Occlusion fill ready" << endl;
+    encode_to_disk((string("output").append(left.fileName)).c_str(), crosschecked,
                    unsigned(resizedImage.width), unsigned(resizedImage.height));
 
 
