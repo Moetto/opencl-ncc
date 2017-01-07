@@ -99,7 +99,8 @@ __kernel void cross_check(
     __read_only image2d_t left,
     __read_only image2d_t right,
     __write_only image2d_t output,
-    uint threshold
+    uint threshold,
+    uint max_disp
     ) {
     int x = get_global_id(0);
     int y = get_global_id(1);
@@ -111,6 +112,7 @@ __kernel void cross_check(
     uint r = read_imageui(right, sampler, coord).s0;
 
     if(abs(l-r) < threshold){
+        l = l * 255 / max_disp;
         uint4 pix = {l, l, l, 255};
         write_imageui(output, coord, pix);
     } else {

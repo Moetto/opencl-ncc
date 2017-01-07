@@ -265,11 +265,11 @@ int main(int argc, char *argv[]) {
                        unsigned(resizedImage.width), unsigned(resizedImage.height));
     }
 
-
     crossCheck.setArg(0, left.znccd);
     crossCheck.setArg(1, right.znccd);
     crossCheck.setArg(2, crossChecked);
     crossCheck.setArg(3, 8);
+    crossCheck.setArg(4, 70);
 
     cl::Event e1;
     int err = queue.enqueueNDRangeKernel(crossCheck, cl::NullRange,
