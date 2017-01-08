@@ -11,10 +11,12 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 set(SOURCE_FILES
         main.cpp
         resize.cl
-        lodepng.h
-        lodepng.cpp
         ../lib/timing.h
         ../lib/timing.cpp
+        ../lib/opencl-helpers.h
+        ../lib/opencl-helpers.cpp
+        ../lib/lodepng.h
+        ../lib/lodepng.cpp
         )
 
 add_executable(opencl_impl ${SOURCE_FILES})
