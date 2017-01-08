@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 #define __CL_ENABLE_EXCEPTIONS
+
 #include <CL/cl.hpp>
 #include <iostream>
 #include <fstream>
@@ -96,7 +97,7 @@ int main(int argc, char *argv[]) {
         << (device.getInfo<CL_DEVICE_LOCAL_MEM_SIZE>() / 1024) << " MBs" << endl
         << device.getInfo<CL_DEVICE_MAX_COMPUTE_UNITS>() << " compute units" << endl
         << device.getInfo<CL_DEVICE_MAX_CLOCK_FREQUENCY>() << " MHz max frequency" << endl
-        << device.getInfo<CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE>() << "KBs max constant buffer" << endl
+        << device.getInfo<CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE>() << " KBs max constant buffer" << endl
         << device.getInfo<CL_DEVICE_MAX_WORK_GROUP_SIZE>() << " max work group size " << endl
         << "(" << work_item_size[0] << ", " << work_item_size[1] << ", " << work_item_size[2] <<
         ") max work item size" << endl;
@@ -193,6 +194,7 @@ int main(int argc, char *argv[]) {
 
     vector<cl::Event> meanEvents = vector<cl::Event>();
     vector<cl::Event> resizeEvents = vector<cl::Event>();
+    timer.checkPoint("Resize and grayscale");
     for (auto set : {left, right}) {
         try {
             resize.setArg(2, set.original);
@@ -208,7 +210,6 @@ int main(int argc, char *argv[]) {
         cl::Event e1, e2;
         vector<cl::Event> resizeEvent = vector<cl::Event>();
 
-        timer.checkPoint("Resize and grayscale");
         err = queue.enqueueNDRangeKernel(resize, cl::NullRange, cl::NDRange(w, h), cl::NullRange, NULL, &e1);
         resizeEvent.push_back(e1);
         resizeEvents.push_back(e1);
@@ -231,6 +232,7 @@ int main(int argc, char *argv[]) {
     zncc.setArg(5, 4);
     vector<cl::Event> znccEvents = vector<cl::Event>();
 
+    timer.checkPoint("Start zncc");
     for (int i = 0; i < 2; i++) {
         vector<uint8_t> output(resizedImage.height * resizedImage.width * 4);
         int min_disp, max_disp;
@@ -249,7 +251,6 @@ int main(int argc, char *argv[]) {
 
         cl::Event e1;
 
-        timer.checkPoint("Start zncc");
         int err = queue.enqueueNDRangeKernel(zncc, cl::NullRange,
                                              cl::NDRange(resizedImage.width, resizedImage.height), cl::NullRange,
                                              &meanEvents,
@@ -287,7 +288,8 @@ int main(int argc, char *argv[]) {
     occlusionFill.setArg(1, occlusionFilled);
 
     cl::Event e2;
-
+    e1.wait();
+    timer.checkPoint("Cross check ready");
     err = queue.enqueueNDRangeKernel(occlusionFill, cl::NullRange,
                                      cl::NDRange(resizedImage.width, resizedImage.height), cl::NullRange,
                                      &crossCheckEvents, &e2);
@@ -295,6 +297,8 @@ int main(int argc, char *argv[]) {
     vector<uint8_t> output(resizedImage.height * resizedImage.width * 4);
 
     e2.wait();
+    timer.checkPoint("Occlusion fill ready");
+
     for (auto e : resizeEvents){
         cout << "Resize ready in " << outputEventExecutionTime(e) << endl;
     }
