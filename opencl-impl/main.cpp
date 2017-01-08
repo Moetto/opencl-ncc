@@ -105,8 +105,8 @@ int main(int argc, char *argv[]) {
 
     cl::CommandQueue queue = cl::CommandQueue(ctx, devices[0], CL_QUEUE_PROFILING_ENABLE);
 
-    std::ifstream resize_kernel_file("resize.cl");
-    std::string resize_text((std::istreambuf_iterator<char>(resize_kernel_file)),
+    std::ifstream kernels("resize.cl");
+    std::string resize_text((std::istreambuf_iterator<char>(kernels)),
                             std::istreambuf_iterator<char>());
 
     cl::Program program = cl::Program(ctx,
@@ -210,7 +210,7 @@ int main(int argc, char *argv[]) {
         cl::Event e1, e2;
         vector<cl::Event> resizeEvent = vector<cl::Event>();
 
-        err = queue.enqueueNDRangeKernel(resize, cl::NullRange, cl::NDRange(w, h), cl::NullRange, NULL, &e1);
+        err = queue.enqueueNDRangeKernel(resize, cl::NullRange, cl::NDRange(resizedImage.width, resizedImage.height), cl::NullRange, NULL, &e1);
         resizeEvent.push_back(e1);
         resizeEvents.push_back(e1);
         err = queue.enqueueNDRangeKernel(mean, cl::NullRange, cl::NDRange(resizedImage.width, resizedImage.height),
