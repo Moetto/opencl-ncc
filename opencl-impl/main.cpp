@@ -36,6 +36,17 @@ int getIntArg(char *arg, int defval) {
     }
 }
 
+double outputEventExecutionTime(const cl::Event &e) {
+    cl_int err;
+    try {
+        return (e.getProfilingInfo<CL_PROFILING_COMMAND_END>(&err) - e.getProfilingInfo<CL_PROFILING_COMMAND_START>()) /
+               1e9;
+    } catch (const cl::Error &e) {
+        cout << e.what() << " " << e.err() << endl;
+        return 0;
+    }
+}
+
 int main(int argc, char *argv[]) {
     Timer timer = Timer();
     timer.start();
@@ -91,7 +102,7 @@ int main(int argc, char *argv[]) {
         ") max work item size" << endl;
     }
 
-    cl::CommandQueue queue = cl::CommandQueue(ctx, devices[0]);
+    cl::CommandQueue queue = cl::CommandQueue(ctx, devices[0], CL_QUEUE_PROFILING_ENABLE);
 
     std::ifstream resize_kernel_file("resize.cl");
     std::string resize_text((std::istreambuf_iterator<char>(resize_kernel_file)),
@@ -181,6 +192,7 @@ int main(int argc, char *argv[]) {
     end[2] = 1;
 
     vector<cl::Event> meanEvents = vector<cl::Event>();
+    vector<cl::Event> resizeEvents = vector<cl::Event>();
     for (auto set : {left, right}) {
         try {
             resize.setArg(2, set.original);
@@ -199,6 +211,7 @@ int main(int argc, char *argv[]) {
         timer.checkPoint("Resize and grayscale");
         err = queue.enqueueNDRangeKernel(resize, cl::NullRange, cl::NDRange(w, h), cl::NullRange, NULL, &e1);
         resizeEvent.push_back(e1);
+        resizeEvents.push_back(e1);
         err = queue.enqueueNDRangeKernel(mean, cl::NullRange, cl::NDRange(resizedImage.width, resizedImage.height),
                                          cl::NullRange, &resizeEvent, &e2);
         meanEvents.push_back(e2);
@@ -279,9 +292,22 @@ int main(int argc, char *argv[]) {
                                      cl::NDRange(resizedImage.width, resizedImage.height), cl::NullRange,
                                      &crossCheckEvents, &e2);
 
-     vector<uint8_t> output(resizedImage.height * resizedImage.width * 4);
+    vector<uint8_t> output(resizedImage.height * resizedImage.width * 4);
 
     e2.wait();
+    for (auto e : resizeEvents){
+        cout << "Resize ready in " << outputEventExecutionTime(e) << endl;
+    }
+
+    for (auto e : meanEvents) {
+        cout << "Mean ready in " << outputEventExecutionTime(e) << endl;
+    }
+
+    for (auto e : znccEvents) {
+        cout << "Zncc ready in " << outputEventExecutionTime(e) << endl;
+    }
+    cout << "Cross check ready in " << outputEventExecutionTime(e1) << endl;
+    cout << "Occlusion fill ready in " << outputEventExecutionTime(e2) << endl;
     save_image_to_disk("ready.png", queue, occlusionFilled, start, end);
 
     timer.stop();
