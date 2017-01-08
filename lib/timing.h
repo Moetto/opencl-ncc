@@ -27,7 +27,7 @@ private:
 
     vector<timeStamp> checkPoints;
 
-    void outputDiff(timeStamp t1, timeStamp t2);
+    void outputDiff(timeStamp t1, timeStamp t2, timeStamp start);
 
 public:
     Timer();
