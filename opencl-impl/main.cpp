@@ -79,7 +79,16 @@ int main(int argc, char *argv[]) {
     for (auto device: devices) {
         std::string name;
         device.getInfo(CL_DEVICE_NAME, &name);
-        cout << name << endl;
+        vector<size_t> work_item_size = device.getInfo<CL_DEVICE_MAX_WORK_ITEM_SIZES>();
+        cout << name << endl
+        << (device.getInfo<CL_DEVICE_LOCAL_MEM_TYPE>() == CL_LOCAL ? "local" : "global") << " memory" << endl
+        << (device.getInfo<CL_DEVICE_LOCAL_MEM_SIZE>() / 1024) << " MBs" << endl
+        << device.getInfo<CL_DEVICE_MAX_COMPUTE_UNITS>() << " compute units" << endl
+        << device.getInfo<CL_DEVICE_MAX_CLOCK_FREQUENCY>() << " MHz max frequency" << endl
+        << device.getInfo<CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE>() << "KBs max constant buffer" << endl
+        << device.getInfo<CL_DEVICE_MAX_WORK_GROUP_SIZE>() << " max work group size " << endl
+        << "(" << work_item_size[0] << ", " << work_item_size[1] << ", " << work_item_size[2] <<
+        ") max work item size" << endl;
     }
 
     cl::CommandQueue queue = cl::CommandQueue(ctx, devices[0]);
