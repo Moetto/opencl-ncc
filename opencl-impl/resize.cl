@@ -46,49 +46,64 @@ __kernel void calculate_zncc(
         __read_only image2d_t left_mean,
         __read_only image2d_t right_mean,
         __write_only image2d_t output,
+        uint max_disp,
+        __local float * znccs,
+        __local float *lower_left_sum,
         int window_size,
-        int min_disp,
-        int max_disp
+        int inverse_disp
         ) {
         sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP_TO_EDGE | CLK_FILTER_LINEAR;
         int x = get_global_id(0);
         int y = get_global_id(1);
+        int local_id = get_local_id(2);
+        int disp = inverse_disp * local_id;
         int2 coord = {x, y};
 
         int l_mean = read_imageui(left_mean, sampler, coord).s0;
-        float lower_left_sum = 0;
-        int best_disp = min_disp;
         float best_zncc = 0;
 
-        for(int y1 = -window_size ; y1 <= window_size; y1++ ) {
-            for (int x1 = -window_size ; x1 <= window_size ; x1++ ){
-                int2 coord2 = {x+x1, y+y1};
-                int pix_val = read_imageui(left, sampler, coord2).s0 - l_mean;
-                lower_left_sum += pix_val*pix_val;
+        if(disp == 0){
+            for(int y1 = -window_size ; y1 <= window_size; y1++ ) {
+                for (int x1 = -window_size ; x1 <= window_size ; x1++ ){
+                    int2 coord2 = {x+x1, y+y1};
+                    int pix_val = read_imageui(left, sampler, coord2).s0 - l_mean;
+                    *lower_left_sum = *lower_left_sum + pix_val;
+                }
+            }
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+
+        float lower_right_sum = 0;
+        long upper_sum = 0;
+        for(int y2 = -window_size ; y2 <= window_size; y2++ ) {
+            for (int x2 = -window_size ; x2 <= window_size ; x2++ ){
+                int2 coord2 = {x+x2, y+y2};
+                int l_pix_val = read_imageui(left, sampler, coord2).s0 - l_mean;
+                int2 coord3 = {x+x2-disp, y+y2};
+                uint r_mean = read_imageui(right_mean, sampler, coord3).s0;
+                int r_pix_val = read_imageui(right, sampler, coord3).s0 - r_mean;
+                lower_right_sum += r_pix_val*r_pix_val;
+                upper_sum += r_pix_val * l_pix_val;
             }
         }
 
-        for (int disp = min_disp ; disp < max_disp ; disp++) {
-            float lower_right_sum = 0;
-            long upper_sum = 0;
-            for(int y2 = -window_size ; y2 <= window_size; y2++ ) {
-                for (int x2 = -window_size ; x2 <= window_size ; x2++ ){
-                    int2 coord2 = {x+x2, y+y2};
-                    int l_pix_val = read_imageui(left, sampler, coord2).s0 - l_mean;
-                    int2 coord3 = {x+x2-disp, y+y2};
-                    uint r_mean = read_imageui(right_mean, sampler, coord3).s0;
-                    int r_pix_val = read_imageui(right, sampler, coord3).s0 - r_mean;
-                    lower_right_sum += r_pix_val*r_pix_val;
-                    upper_sum += r_pix_val * l_pix_val;
-                }
-            }
-            float zncc = upper_sum / (sqrt(lower_left_sum)*sqrt(lower_right_sum));
-            if (zncc > best_zncc) {
-                best_disp = disp;
+        float zncc = upper_sum / (sqrt(*lower_left_sum)*sqrt(lower_right_sum));
+        znccs[abs(disp)] = zncc;
+        barrier(CLK_LOCAL_MEM_FENCE);
+
+        if (disp > 0){
+            return;
+        }
+
+        uint best_disp = 0;
+        for(uint i = 0 ; i < max_disp ; i++) {
+             zncc = znccs[i];
+             if (zncc > best_zncc) {
+                best_disp = i;
                 best_zncc = zncc;
             }
         }
-        best_disp = abs(best_disp);
+
         uint4 best_pix = {best_disp, best_disp, best_disp, 255};
         write_imageui(output, coord, best_pix);
 }

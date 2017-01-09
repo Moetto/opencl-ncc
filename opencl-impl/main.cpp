@@ -31,8 +31,7 @@ int getIntArg(char *arg, int defval) {
     if (!(ss >> x)) {
         cerr << "Invalid number " << arg << endl;
         return defval;
-    }
-    else {
+    } else {
         return x;
     }
 }
@@ -93,14 +92,14 @@ int main(int argc, char *argv[]) {
         device.getInfo(CL_DEVICE_NAME, &name);
         vector<size_t> work_item_size = device.getInfo<CL_DEVICE_MAX_WORK_ITEM_SIZES>();
         cout << name << endl
-        << (device.getInfo<CL_DEVICE_LOCAL_MEM_TYPE>() == CL_LOCAL ? "local" : "global") << " memory" << endl
-        << (device.getInfo<CL_DEVICE_LOCAL_MEM_SIZE>() / 1024) << " MBs" << endl
-        << device.getInfo<CL_DEVICE_MAX_COMPUTE_UNITS>() << " compute units" << endl
-        << device.getInfo<CL_DEVICE_MAX_CLOCK_FREQUENCY>() << " MHz max frequency" << endl
-        << device.getInfo<CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE>() << " KBs max constant buffer" << endl
-        << device.getInfo<CL_DEVICE_MAX_WORK_GROUP_SIZE>() << " max work group size " << endl
-        << "(" << work_item_size[0] << ", " << work_item_size[1] << ", " << work_item_size[2] <<
-        ") max work item size" << endl;
+             << (device.getInfo<CL_DEVICE_LOCAL_MEM_TYPE>() == CL_LOCAL ? "local" : "global") << " memory" << endl
+             << (device.getInfo<CL_DEVICE_LOCAL_MEM_SIZE>() / 1024) << " MBs" << endl
+             << device.getInfo<CL_DEVICE_MAX_COMPUTE_UNITS>() << " compute units" << endl
+             << device.getInfo<CL_DEVICE_MAX_CLOCK_FREQUENCY>() << " MHz max frequency" << endl
+             << device.getInfo<CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE>() << " KBs max constant buffer" << endl
+             << device.getInfo<CL_DEVICE_MAX_WORK_GROUP_SIZE>() << " max work group size " << endl
+             << "(" << work_item_size[0] << ", " << work_item_size[1] << ", " << work_item_size[2] <<
+             ") max work item size" << endl;
     }
 
     cl::CommandQueue queue = cl::CommandQueue(ctx, devices[0], CL_QUEUE_PROFILING_ENABLE);
@@ -116,9 +115,9 @@ int main(int argc, char *argv[]) {
         program.build(devices);
     } catch (const cl::Error &) {
         std::cerr
-        << "OpenCL compilation error" << endl
-        << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(devices[0])
-        << std::endl;
+                << "OpenCL compilation error" << endl
+                << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(devices[0])
+                << std::endl;
         return 1;
     }
 
@@ -157,7 +156,8 @@ int main(int argc, char *argv[]) {
 
     } catch (const cl::Error &ex) {
         std::cerr
-        << "Error creating image " << endl << ex.what() << " " << ex.err() << endl << "Error " << image_err << endl;
+                << "Error creating image " << endl << ex.what() << " " << ex.err() << endl << "Error " << image_err
+                << endl;
         return 1;
     }
 
@@ -210,7 +210,8 @@ int main(int argc, char *argv[]) {
         cl::Event e1, e2;
         vector<cl::Event> resizeEvent = vector<cl::Event>();
 
-        err = queue.enqueueNDRangeKernel(resize, cl::NullRange, cl::NDRange(resizedImage.width, resizedImage.height), cl::NullRange, NULL, &e1);
+        err = queue.enqueueNDRangeKernel(resize, cl::NullRange, cl::NDRange(resizedImage.width, resizedImage.height),
+                                         cl::NullRange, NULL, &e1);
         resizeEvent.push_back(e1);
         resizeEvents.push_back(e1);
         err = queue.enqueueNDRangeKernel(mean, cl::NullRange, cl::NDRange(resizedImage.width, resizedImage.height),
@@ -229,7 +230,10 @@ int main(int argc, char *argv[]) {
 #endif
     }
 
-    zncc.setArg(5, 4);
+    zncc.setArg(5, 64);
+    zncc.setArg(6, 64 * sizeof(float), NULL);
+    zncc.setArg(7, sizeof(float), NULL);
+    zncc.setArg(8, 4);
     vector<cl::Event> znccEvents = vector<cl::Event>();
 
     timer.checkPoint("Start zncc");
@@ -246,19 +250,32 @@ int main(int argc, char *argv[]) {
         zncc.setArg(2, l.meaned);
         zncc.setArg(3, r.meaned);
         zncc.setArg(4, l.znccd);
-        zncc.setArg(6, min_disp);
-        zncc.setArg(7, max_disp);
+        zncc.setArg(9, i == 0 ? 1 : -1);
 
         cl::Event e1;
-
-        int err = queue.enqueueNDRangeKernel(zncc, cl::NullRange,
-                                             cl::NDRange(resizedImage.width, resizedImage.height), cl::NullRange,
-                                             &meanEvents,
-                                             &e1);
+        try {
+            int err = queue.enqueueNDRangeKernel(zncc, cl::NullRange,
+                                                 cl::NDRange(resizedImage.width, resizedImage.height, 64),
+                                                 cl::NDRange(1, 1, 64),
+                                                 &meanEvents,
+                                                 &e1);
+            if (err != CL_SUCCESS) {
+                cout << "zncc err " << err << endl;
+                return 1;
+            }
+        } catch (const cl::Error &e) {
+            cout << "hv " << e.what() << " " << e.err() << endl;
+            return 1;
+        }
         znccEvents.push_back(e1);
 
 #ifdef  SAVE_INTERMEDIATE_STEPS
-        e1.wait();
+        try {
+            e1.wait();
+        } catch (const cl::Error &e) {
+            cout << "save hv " << e.what() << " " << e.err() << endl;
+            return 1;
+        }
         timer.checkPoint("Zncc ready");
         save_image_to_disk(string("").append(l.fileName), queue, l.znccd, start, end);
 #endif
@@ -271,9 +288,19 @@ int main(int argc, char *argv[]) {
     crossCheck.setArg(4, ndisp);
 
     cl::Event e1;
-    int err = queue.enqueueNDRangeKernel(crossCheck, cl::NullRange,
+    int err;
+    try {
+        err = queue.enqueueNDRangeKernel(crossCheck, cl::NullRange,
                                          cl::NDRange(resizedImage.width, resizedImage.height), cl::NullRange,
                                          &znccEvents, &e1);
+        if (err != CL_SUCCESS) {
+            cout << "crossCheck error " << err << endl;
+            return 1;
+        }
+    } catch (const cl::Error &e) {
+        cout << e.what() << " " << e.err() << endl;
+        return 1;
+    }
     vector<cl::Event> crossCheckEvents = vector<cl::Event>();
     crossCheckEvents.push_back(e1);
 
@@ -288,18 +315,28 @@ int main(int argc, char *argv[]) {
     occlusionFill.setArg(1, occlusionFilled);
 
     cl::Event e2;
-    e1.wait();
     timer.checkPoint("Cross check ready");
-    err = queue.enqueueNDRangeKernel(occlusionFill, cl::NullRange,
-                                     cl::NDRange(resizedImage.width, resizedImage.height), cl::NullRange,
-                                     &crossCheckEvents, &e2);
+    try {
+        err = queue.enqueueNDRangeKernel(occlusionFill, cl::NullRange,
+                                         cl::NDRange(resizedImage.width, resizedImage.height), cl::NullRange,
+                                         &crossCheckEvents, &e2);
+    } catch (const cl::Error &e) {
+        cout << e.what() << " " << e.what() << endl;
+        return 1;
+    }
 
     vector<uint8_t> output(resizedImage.height * resizedImage.width * 4);
 
-    e2.wait();
+
+    try {
+        e2.wait();
+    } catch (const cl::Error &e) {
+        cout << e.what() << " " << e.err() << endl;
+        return 1;
+    }
     timer.checkPoint("Occlusion fill ready");
 
-    for (auto e : resizeEvents){
+    for (auto e : resizeEvents) {
         cout << "Resize ready in " << outputEventExecutionTime(e) << endl;
     }
 
