@@ -1,36 +1,34 @@
 __kernel void resize(
-        const long height,
         const long width,
+        const long height,
         __read_only image2d_t original,
-        __write_only image2d_t resized,
-        const long image_size) {
+        __global uint * buffer
+        ){
 
     int x = get_global_id(0);
     int y = get_global_id(1);
     int2 coord = {x*4, y*4};
-    int2 coord2 = {x, y};
     sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_NONE | CLK_FILTER_LINEAR;
     uint4 pixel = read_imageui(original, sampler, coord);
     uint gs = (uint) (pixel.s0 * 0.2126 + pixel.s1 * 0.7152 + pixel.s2 * 0.0722);
-    uint4 gs_pixel = {gs, gs, gs, 255};
-    write_imageui(resized, coord2, gs_pixel);
+    buffer[y * width + x] = gs;
 }
 
 
 __kernel void calculate_mean(
-        __read_only image2d_t input,
-        __write_only image2d_t output,
-        int window_size) {
+    __global uint * input,
+    __write_only image2d_t output,
+    int window_size,
+    int width
+    ) {
     int x = get_global_id(0);
     int y = get_global_id(1);
     int2 coord = {x, y};
-    sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP_TO_EDGE | CLK_FILTER_LINEAR;
 
     ulong mean = 0;
     for (int y1 = - window_size; y1 <= window_size ; y1++) {
         for (int x1 = -window_size ; x1 <= window_size ; x1++) {
-            int2 coord2 = {x+x1, y+y1};
-            mean += read_imageui(input, sampler, coord2).s0;
+            mean += input[(y+y1)*width + x];
         }
     }
 
@@ -41,8 +39,8 @@ __kernel void calculate_mean(
 
 
 __kernel void calculate_zncc(
-        __read_only image2d_t left,
-        __read_only image2d_t right,
+        __global uint * left,
+        __global uint * right,
         __read_only image2d_t left_mean,
         __read_only image2d_t right_mean,
         __write_only image2d_t output,
@@ -50,48 +48,49 @@ __kernel void calculate_zncc(
         __local float * znccs,
         __local float *lower_left_sum,
         int window_size,
-        int inverse_disp
+        int inverse_disp,
+        uint width,
+        uint height
         ) {
         sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP_TO_EDGE | CLK_FILTER_LINEAR;
-        int x = get_global_id(0);
-        int y = get_global_id(1);
+        uint x = get_global_id(0);
+        uint y = get_global_id(1);
         int local_id = get_local_id(2);
         int disp = inverse_disp * local_id;
         int2 coord = {x, y};
+        uint index = y*width+x;
 
         int l_mean = read_imageui(left_mean, sampler, coord).s0;
         float best_zncc = 0;
 
-        if(disp == 0){
+        if (disp == 0){
             for(int y1 = -window_size ; y1 <= window_size; y1++ ) {
                 for (int x1 = -window_size ; x1 <= window_size ; x1++ ){
-                    int2 coord2 = {x+x1, y+y1};
-                    int pix_val = read_imageui(left, sampler, coord2).s0 - l_mean;
+                    uint pix_val = left[y*width+x];
                     *lower_left_sum = *lower_left_sum + pix_val;
                 }
             }
         }
-        barrier(CLK_LOCAL_MEM_FENCE);
 
         float lower_right_sum = 0;
-        long upper_sum = 0;
+        float upper_sum = 0;
         for(int y2 = -window_size ; y2 <= window_size; y2++ ) {
             for (int x2 = -window_size ; x2 <= window_size ; x2++ ){
                 int2 coord2 = {x+x2, y+y2};
-                int l_pix_val = read_imageui(left, sampler, coord2).s0 - l_mean;
+                int l_pix_val = left[min((int)(height - 1), max((int)0, (int)(y + y2))) * width + min((int)(width - 1), max((int)0, (int)(x + x2)))] - l_mean;
                 int2 coord3 = {x+x2-disp, y+y2};
                 uint r_mean = read_imageui(right_mean, sampler, coord3).s0;
-                int r_pix_val = read_imageui(right, sampler, coord3).s0 - r_mean;
-                lower_right_sum += r_pix_val*r_pix_val;
+                int r_pix_val = right[min((int)(height -1), max((int)0, (int)(y + y2))) * width + min((int)(width - 1), max((int)0, (int)(x + x2 - disp)))] - r_mean;
+                lower_right_sum += r_pix_val * r_pix_val;
                 upper_sum += r_pix_val * l_pix_val;
             }
         }
 
-        float zncc = upper_sum / (sqrt(*lower_left_sum)*sqrt(lower_right_sum));
-        znccs[abs(disp)] = zncc;
         barrier(CLK_LOCAL_MEM_FENCE);
+        float zncc = upper_sum / (sqrt(*lower_left_sum) * sqrt(lower_right_sum));
+        znccs[local_id] = zncc;
 
-        if (disp > 0){
+        if (disp > 0) {
             return;
         }
 

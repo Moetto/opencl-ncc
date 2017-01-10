@@ -21,7 +21,8 @@ using std::string;
 
 struct imageSet {
     Image originalImage;
-    cl::Image2D original, gs, meaned, znccd;
+    cl::Image2D original, meaned, znccd, for_mean;
+    cl::Buffer gs;
     string fileName;
 } left, right;
 
@@ -133,8 +134,10 @@ int main(int argc, char *argv[]) {
     try {
         left.original = cl::Image2D(ctx, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, imageFormat, w,
                                     h, 0, &left.originalImage.pixels[0], &image_err);
-        left.gs = cl::Image2D(ctx, CL_MEM_READ_WRITE, imageFormat, resizedImage.width, resizedImage.height, 0,
-                              NULL, &image_err);
+        left.gs = cl::Buffer(ctx, CL_MEM_READ_WRITE, resizedImage.height * resizedImage.width * sizeof(uint), NULL,
+                             NULL);
+        left.for_mean = cl::Image2D(ctx, CL_MEM_READ_WRITE, imageFormat, resizedImage.width, resizedImage.height, 0,
+                                    NULL, &image_err);
         left.meaned = cl::Image2D(ctx, CL_MEM_READ_WRITE, imageFormat, resizedImage.width, resizedImage.height, 0,
                                   NULL, &image_err);
         left.znccd = cl::Image2D(ctx, CL_MEM_READ_WRITE, imageFormat, resizedImage.width, resizedImage.height, 0, NULL,
@@ -142,8 +145,10 @@ int main(int argc, char *argv[]) {
 
         right.original = cl::Image2D(ctx, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, imageFormat, w,
                                      h, 0, &right.originalImage.pixels[0], &image_err);
-        right.gs = cl::Image2D(ctx, CL_MEM_READ_WRITE, imageFormat, resizedImage.width, resizedImage.height, 0,
-                               NULL, &image_err);
+        right.gs = cl::Buffer(ctx, CL_MEM_READ_WRITE, resizedImage.height * resizedImage.width * sizeof(uint), NULL,
+                              NULL);
+        right.for_mean = cl::Image2D(ctx, CL_MEM_READ_WRITE, imageFormat, resizedImage.width, resizedImage.height, 0,
+                                     NULL, &image_err);
         right.meaned = cl::Image2D(ctx, CL_MEM_READ_WRITE, imageFormat, resizedImage.width, resizedImage.height, 0,
                                    NULL, &image_err);
         right.znccd = cl::Image2D(ctx, CL_MEM_READ_WRITE, imageFormat, resizedImage.width, resizedImage.height, 0,
@@ -173,10 +178,10 @@ int main(int argc, char *argv[]) {
     cl::Kernel occlusionFill(program, "nearest_nonzero");
 
     try {
-        resize.setArg(0, h);
-        resize.setArg(1, w);
-        resize.setArg(4, h * w);
+        resize.setArg(0, resizedImage.width);
+        resize.setArg(1, resizedImage.height);
         mean.setArg(2, 4);
+        mean.setArg(3, 735);
     } catch (const cl::Error &ex) {
         std::cerr << ex.what() << " " << ex.err() << endl;
         return 1;
@@ -225,7 +230,7 @@ int main(int argc, char *argv[]) {
 #ifdef SAVE_INTERMEDIATE_STEPS
         e2.wait();
         timer.checkPoint("Save image");
-        save_image_to_disk(string("gs_").append(set.fileName), queue, set.gs, start, end);
+        save_image_to_disk(string("gs_").append(set.fileName), queue, set.for_mean, start, end);
         timer.checkPoint("Save ready");
 #endif
     }
@@ -234,6 +239,8 @@ int main(int argc, char *argv[]) {
     zncc.setArg(6, 64 * sizeof(float), NULL);
     zncc.setArg(7, sizeof(float), NULL);
     zncc.setArg(8, 4);
+    zncc.setArg(10, 735);
+    zncc.setArg(11, 504);
     vector<cl::Event> znccEvents = vector<cl::Event>();
 
     timer.checkPoint("Start zncc");
@@ -245,8 +252,8 @@ int main(int argc, char *argv[]) {
         imageSet l = i == 0 ? left : right;
         imageSet r = i == 0 ? right : left;
 
-        zncc.setArg(0, l.gs);
-        zncc.setArg(1, r.gs);
+        zncc.setArg(0, sizeof(l.gs), &l.gs);
+        zncc.setArg(1, sizeof(r.gs), &r.gs);
         zncc.setArg(2, l.meaned);
         zncc.setArg(3, r.meaned);
         zncc.setArg(4, l.znccd);
