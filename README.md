@@ -1,7 +1,9 @@
 # OpenCL stereo disparity algorithm - Multiprocessor programming exercise
 We have implemented an algorithm for creating a depth map using two images taken of the same scene with an offset in the horizontal axis. The program was originally created in C++, then ported to use OpenCL bindings to perform computations a desktop/laptop GPU, and finally the OpenCL code was adapted to be run on the Odroid-XU4 embedded system.
 
-The algorithm consists of three distinct parts: Preprocessing, wherein the input images are resized and greyscaled; The algorithm itself, where a disparity map is calculated by using zero-mean normalized cross-correlation (ZNCC) as the likeness criteria; and the post-processing, where the disparity maps of both images are cross-checked and the non-correlating
+The algorithm consists of three distinct parts: Preprocessing, wherein the input images are resized and greyscaled; The algorithm itself, where a disparity map is calculated by using zero-mean normalized cross-correlation (ZNCC) as the likeness criteria; and the post-processing, where the disparity maps of both images are cross-checked and the non-correlating pixels are filled with nearest neighbours.
+
+The final algorithm uses a `MAX_DISP` of 64, a square, constant window of `WIN_SIZE` 9 centered around each pixel. The threshold value used for cross-check is 8 (in the range 0..`MAX_DISP`).
 
 ## Preprocessing
 In all implementations, the images are resized by taking a pixel from every 4th row and every 4th column, which is converted from RGBA values to 8-bit integer values, and outputting it to a smaller image. This resized greyscale image is used for further steps.
@@ -29,9 +31,15 @@ The OpenCL implementation consists of 5 kernels: `resize`, `calculate_mean`, `ca
 ### resize
 This kernel uses a range of x=0..(width/4)-1 and y=0..(height/4)-1, for each pixel in the output image. Images are read and written using OpenCL `image` objects in global memory. There is no need to use local memory as reads and writes are performed for only one pixel per work-group.
 
+The initial OpenCL (and the C++) implementation iterates over all of the original image pixels, but that was optimized using the above.
+
 ### calculate_mean
+This kernel also uses the same pixel-wise `global_id`s as the `resize` kernel, although it could possibly be optimized by using local memory to store values that are frequently reused. Another way to optimize this would be to remember column sums and carry them over when progressing through the computation. However, the time used by this operation is also very small compared to `calculate_zncc` that most optimizations would be negligible. 
 
 ### calculate_zncc
+Initially, this kernel used the same indexing as above, where each work group only had one work item that went through all possible disparity values. This was improved by assigning one work item for each disparity value, so that much of the input could be shared between the work group. The `MAX_DISP` value was limited to 64 due to a hardware limitation of max work items.
+
+One optimization that would be possible, but was not implemented, is utilizing the fact that `ZNCC(L,R,x,y,d)` is equal to `ZNCC(R,L,x-d,y,-d)` -- knowing this, the ZNCC values for each pixel and disparity value could be computed once, and the argmax for `d` (a much less expensive operation) could then be calculated separately. This could be performed for the entire image, or for one row at a time to save memory, where a `MAX_DISP * WIDTH` block could even fit in local memory for a great increase in speed.
 
 ### cross-check
 The cross-check kernel reads from both `image2d_t`s in global memory and outputs to one `image2d_t`. Local memory would not help as each pixel is only accessed once.
