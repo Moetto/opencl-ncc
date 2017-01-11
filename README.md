@@ -1,5 +1,5 @@
 # OpenCL stereo disparity algorithm - Multiprocessor programming exercise
-We have implemented an algorithm for creating a depth map using two images taken of the same scene with an offset in the horizontal axis. The program was originally created in C++, then ported to use OpenCL bindings to perform computations a desktop/laptop GPU, and finally the OpenCL was adapted to be run on the Odroid-XU4 embedded system.
+We have implemented an algorithm for creating a depth map using two images taken of the same scene with an offset in the horizontal axis. The program was originally created in C++, then ported to use OpenCL bindings to perform computations a desktop/laptop GPU, and finally the OpenCL code was adapted to be run on the Odroid-XU4 embedded system.
 
 The algorithm consists of three distinct parts: Preprocessing, wherein the input images are resized and greyscaled; The algorithm itself, where a disparity map is calculated by using zero-mean normalized cross-correlation (ZNCC) as the likeness criteria; and the post-processing, where the disparity maps of both images are cross-checked and the non-correlating
 
@@ -24,7 +24,20 @@ The occlusion takes the single image produced by the cross-check and outputs for
 The final output is written to disk after the occlusion fill.
 
 ## OpenCL details
-The OpenCL implementation consists of 5 kernels: ´resize´, ´mean´, ´zncc_algorithm´, ´cross_check´ and ´nearest_nonzero´.
+The OpenCL implementation consists of 5 kernels: `resize`, `calculate_mean`, `calculate_zncc`, `cross_check` and `nearest_nonzero`.
+
+### resize
+This kernel uses a range of x=0..(width/4)-1 and y=0..(height/4)-1, for each pixel in the output image. Images are read and written using OpenCL `image` objects in global memory. There is no need to use local memory as reads and writes are performed for only one pixel per work-group.
+
+### calculate_mean
+
+### calculate_zncc
+
+### cross-check
+The cross-check kernel reads from both `image2d_t`s in global memory and outputs to one `image2d_t`. Local memory would not help as each pixel is only accessed once.
+
+### nearest_nonzero
+This kernel performs the occlusion fill. It reads and writes ´image´ values from global memory. Local memory could possibly be used as surrounding pixels are accessed, but as the access pattern is somewhat unpredictable and the potential optimization insignificant compared to `calculate_zncc`, this optimization was not performed.
 
 ## Execution times
 ### Hardware (C++ and OpenCL implementations):
