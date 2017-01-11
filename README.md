@@ -33,6 +33,12 @@ The OpenCL implementation consists of 5 kernels: ´resize´, ´mean´, ´zncc_al
 * RAM:
 * OpenCL version:
 
+### Total time:
+* C++           xx.xxxxxxx s
+* OpenCL        xx.xxxxxxx s
+* Optimized     xx.xxxxxxx s
+* Odroid        xx.xxxxxxx s
+
 ### Preprocessing:
 * C++           xx.xxxxxxx s
 * OpenCL        xx.xxxxxxx s
