@@ -27,6 +27,11 @@ The final output is written to disk after the occlusion fill.
 The OpenCL implementation consists of 5 kernels: ´resize´, ´mean´, ´zncc_algorithm´, ´cross_check´ and ´nearest_nonzero´.
 
 ## Execution times
+### Hardware (C++ and OpenCL implementations):
+* CPU:
+* GPU:
+* RAM:
+* OpenCL version:
 
 ### Preprocessing:
 * C++           xx.xxxxxxx s
