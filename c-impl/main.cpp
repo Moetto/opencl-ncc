@@ -2,6 +2,7 @@
 #include <math.h>
 #include "lodepng.h"
 #include <sys/time.h>
+#include "../lib/timing.h"
 
 using std::vector;
 using std::cout;
@@ -450,6 +451,8 @@ Image occlusionFill(const Image &image) {
 
 int main(int argc, char *argv[]) {
 
+    Timer timer = Timer();
+    timer.start();
     const char *left_name = argc > 1 ? argv[1] : "im0.png";
     const char *right_name = argc > 2 ? argv[2] : "im1.png";
     const char *phase = argc > 3 ? argv[3] : "0";
@@ -465,11 +468,13 @@ int main(int argc, char *argv[]) {
     const uint8_t ndisp = 64;
 
     // Cross-check disparity threshold
-    const int cc_thresh = 12;
+    const int cc_thresh = 8;
 
     if (strcmp(phase, "0") == 0) {
+        timer.checkPoint("Load images");
         Image left = load_image(left_name, 4);
         Image right = load_image(right_name, 4);
+        timer.checkPoint("Begin algorithm");
 
         //Here goes the algorithm
         Window window = construct_window(9, 9, left.width);
@@ -489,13 +494,8 @@ int main(int argc, char *argv[]) {
         image2 = load_image("zncc2.png", 1);
     }
 
-    gettimeofday(&startPostProcessing, NULL);
-
-    cout << "Main algorithm ready in " << startPostProcessing.tv_sec - startTime.tv_sec <<
-    " seconds. Beginning post processing" << endl;
+    timer.checkPoint("Begin post processing");
     if (strcmp(phase, "1") == 0) {
-        gettimeofday(&endCrossCheck, NULL);
-
         Image combined = crossCheck(image1, image2, cc_thresh, ndisp);
 
         if (save) {
@@ -504,19 +504,13 @@ int main(int argc, char *argv[]) {
             encode_to_disk("crosschecked.png", image_out, combined.width, combined.height);
         }
 
-        cout << "Cross check ready in " << endCrossCheck.tv_sec - startPostProcessing.tv_sec <<
-                " seconds. Beginning occlusion fill" << endl;
-
+        timer.checkPoint("Begin occlusion fill");
         Image filled = occlusionFill(combined);
 
-        cout << "Output is " << filled.width << " pixels wide" << endl;
         vector<unsigned char> output_image = vector<unsigned char>();
         encode_gs_to_rgb(filled.pixels, output_image);
         encode_to_disk("test.png", output_image, filled.width, filled.height);
     }
-
-    gettimeofday(&endTime, NULL);
-    cout << "Algorithm took " << endTime.tv_sec - startTime.tv_sec << " seconds to complete" << endl;
-
+    timer.stop();
     return 0;
 }
