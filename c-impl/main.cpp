@@ -506,6 +506,7 @@ int main(int argc, char *argv[]) {
 
         timer.checkPoint("Begin occlusion fill");
         Image filled = occlusionFill(combined);
+        timer.checkPoint("Occlusion fill ready");
 
         vector<unsigned char> output_image = vector<unsigned char>();
         encode_gs_to_rgb(filled.pixels, output_image);
