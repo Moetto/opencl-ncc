@@ -1,6 +1,6 @@
 __kernel void resize(
-        const long width,
-        const long height,
+        const int width,
+        const int height,
         __read_only image2d_t original,
         __global uint * buffer
         ){
@@ -8,7 +8,7 @@ __kernel void resize(
     int x = get_global_id(0);
     int y = get_global_id(1);
     int2 coord = {x*4, y*4};
-    sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_NONE | CLK_FILTER_LINEAR;
+    const sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_NONE | CLK_FILTER_LINEAR;
     uint4 pixel = read_imageui(original, sampler, coord);
     uint gs = (uint) (pixel.s0 * 0.2126 + pixel.s1 * 0.7152 + pixel.s2 * 0.0722);
     buffer[y * width + x] = gs;
@@ -52,7 +52,7 @@ __kernel void calculate_zncc(
         uint width,
         uint height
         ) {
-        sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP_TO_EDGE | CLK_FILTER_LINEAR;
+        const sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP_TO_EDGE | CLK_FILTER_LINEAR;
         uint x = get_global_id(0);
         uint y = get_global_id(1);
         int local_id = get_local_id(2);
@@ -119,7 +119,7 @@ __kernel void cross_check(
 
     int2 coord = {x,y};
 
-    sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_NONE | CLK_FILTER_LINEAR;
+    const sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_NONE | CLK_FILTER_LINEAR;
     uint l = read_imageui(left, sampler, coord).s0;
     uint r = read_imageui(right, sampler, coord).s0;
 
@@ -147,7 +147,7 @@ __kernel void nearest_nonzero(
     float closest_dist = -1;
     uint closest_value = 0;
 
-    sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP | CLK_FILTER_LINEAR;
+    const sampler_t sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP | CLK_FILTER_LINEAR;
 
     for (int offset = 0; offset < 100; offset++) {
         if (closest_dist >= 0 && closest_dist <= offset) {

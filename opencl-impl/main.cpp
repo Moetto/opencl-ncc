@@ -3,7 +3,7 @@
 
 #define __CL_ENABLE_EXCEPTIONS
 
-#include <CL/cl.hpp>
+#include "cl.hpp"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -178,6 +178,8 @@ int main(int argc, char *argv[]) {
     cl::Kernel crossCheck(program, "cross_check");
     cl::Kernel occlusionFill(program, "nearest_nonzero");
 
+    const int h2 = h;
+    const int w2 = w;
     try {
         resize.setArg(0, resizedImage.width);
         resize.setArg(1, resizedImage.height);
