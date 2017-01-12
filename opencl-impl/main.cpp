@@ -352,11 +352,10 @@ int main(int argc, char *argv[]) {
         cout << "Mean ready in " << outputEventExecutionTime(e) << endl;
     }
 
-    double total_zncc = 0;
     for (auto e : znccEvents) {
-        total_zncc += outputEventExecutionTime(e);
+        cout << "Zncc ready in " << outputEventExecutionTime(e) << endl;
     }
-    cout << "Zncc ready in " << total_zncc << endl;
+
     cout << "Cross check ready in " << outputEventExecutionTime(e1) << endl;
     cout << "Occlusion fill ready in " << outputEventExecutionTime(e2) << endl;
     save_image_to_disk("ready.png", queue, occlusionFilled, start, end);
