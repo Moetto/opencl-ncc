@@ -69,9 +69,9 @@ int main(int argc, char *argv[]) {
     resizedImage.width = left.originalImage.width / 4;
     resizedImage.height = left.originalImage.height / 4;
 
-    vector<cl::Platform> platforms;
+    vector <cl::Platform> platforms;
     cl::Platform::get(&platforms);
-    vector<cl::Device> devices;
+    vector <cl::Device> devices;
     platforms[0].getDevices(CL_DEVICE_TYPE_GPU, &devices);
 
     timer.checkPoint("Create context");
@@ -86,12 +86,13 @@ int main(int argc, char *argv[]) {
 
     std::string vendor, deviceName;
     platforms[0].getInfo(CL_PLATFORM_VENDOR, &vendor);
+    cout << platforms[0].getInfo<CL_PLATFORM_VERSION>() << endl;
 
     cout << "Selected vendor " << vendor << " and devices " << endl;
     for (auto device: devices) {
         std::string name;
         device.getInfo(CL_DEVICE_NAME, &name);
-        vector<size_t> work_item_size = device.getInfo<CL_DEVICE_MAX_WORK_ITEM_SIZES>();
+        vector <size_t> work_item_size = device.getInfo<CL_DEVICE_MAX_WORK_ITEM_SIZES>();
         cout << name << endl
              << (device.getInfo<CL_DEVICE_LOCAL_MEM_TYPE>() == CL_LOCAL ? "local" : "global") << " memory" << endl
              << (device.getInfo<CL_DEVICE_LOCAL_MEM_SIZE>() / 1024) << " MBs" << endl
@@ -197,8 +198,8 @@ int main(int argc, char *argv[]) {
     end[1] = resizedImage.height;
     end[2] = 1;
 
-    vector<cl::Event> meanEvents = vector<cl::Event>();
-    vector<cl::Event> resizeEvents = vector<cl::Event>();
+    vector <cl::Event> meanEvents = vector<cl::Event>();
+    vector <cl::Event> resizeEvents = vector<cl::Event>();
     timer.checkPoint("Resize and grayscale");
     for (auto set : {left, right}) {
         try {
@@ -213,7 +214,7 @@ int main(int argc, char *argv[]) {
 
         cl_int err;
         cl::Event e1, e2;
-        vector<cl::Event> resizeEvent = vector<cl::Event>();
+        vector <cl::Event> resizeEvent = vector<cl::Event>();
 
         err = queue.enqueueNDRangeKernel(resize, cl::NullRange, cl::NDRange(resizedImage.width, resizedImage.height),
                                          cl::NullRange, NULL, &e1);
@@ -241,11 +242,11 @@ int main(int argc, char *argv[]) {
     zncc.setArg(8, 4);
     zncc.setArg(10, 735);
     zncc.setArg(11, 504);
-    vector<cl::Event> znccEvents = vector<cl::Event>();
+    vector <cl::Event> znccEvents = vector<cl::Event>();
 
     timer.checkPoint("Start zncc");
     for (int i = 0; i < 2; i++) {
-        vector<uint8_t> output(resizedImage.height * resizedImage.width * 4);
+        vector <uint8_t> output(resizedImage.height * resizedImage.width * 4);
         int min_disp, max_disp;
         min_disp = i == 0 ? 0 : -ndisp;
         max_disp = i == 0 ? ndisp : 0;
@@ -308,10 +309,10 @@ int main(int argc, char *argv[]) {
         cout << e.what() << " " << e.err() << endl;
         return 1;
     }
-    vector<cl::Event> crossCheckEvents = vector<cl::Event>();
+    vector <cl::Event> crossCheckEvents = vector<cl::Event>();
     crossCheckEvents.push_back(e1);
 
-    vector<uint8_t> crosschecked(resizedImage.height * resizedImage.width * 4);
+    vector <uint8_t> crosschecked(resizedImage.height * resizedImage.width * 4);
 
 #ifdef SAVE_INTERMEDIATE_STEPS
     e1.wait();
@@ -332,7 +333,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    vector<uint8_t> output(resizedImage.height * resizedImage.width * 4);
+    vector <uint8_t> output(resizedImage.height * resizedImage.width * 4);
 
 
     try {
