@@ -3,7 +3,7 @@
 
 #define __CL_ENABLE_EXCEPTIONS
 
-#include <CL/cl.hpp>
+#include "cl.hpp"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -172,10 +172,11 @@ int main(int argc, char *argv[]) {
     cl::Kernel crossCheck(program, "cross_check");
     cl::Kernel occlusionFill(program, "nearest_nonzero");
 
+    const int h2 = h;
+    const int w2 = w;
     try {
         resize.setArg(0, h);
         resize.setArg(1, w);
-        resize.setArg(4, h * w);
         mean.setArg(2, 4);
     } catch (const cl::Error &ex) {
         std::cerr << ex.what() << " " << ex.err() << endl;

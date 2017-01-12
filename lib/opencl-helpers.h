@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-#include<CL/cl.hpp>
+#include "../opencl-impl/cl.hpp"
 
 struct Image {
     ::size_t height, width;
